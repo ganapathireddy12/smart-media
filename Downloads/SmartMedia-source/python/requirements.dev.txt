@@ -1,0 +1,10 @@
+# SmartMedia Dev Requirements - Lightweight
+# For development and testing without AI models
+# Use this to speed up Docker builds during development
+
+# Core - Required
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Optional: OpenCV for faster image resizing
+opencv-python>=4.8.0

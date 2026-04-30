@@ -1,0 +1,190 @@
+@startuml Activity Diagram - Image Scanning Process
+!theme cerulean-outline
+
+title SmartMedia - Image Scanning & Processing Activity Diagram
+
+|User|
+start
+:Click "Add Photos" button;
+
+|System|
+:Show file picker dialog;
+
+|User|
+:Select image files;
+
+|System|
+:Store file paths in\ndiscoveredImages[];
+
+:Navigate to\nScanningScreen;
+
+|Processing Engine|
+fork
+  :Initialize Python\nengine (if needed);
+  if (Model loaded?) then (No)
+    :Load Qwen2-VL model;
+    note right: Takes ~5-10 seconds\nfirst time only
+    :Model ready;
+  else (Yes)
+    :Use existing model;
+  endif
+fork again
+  :Display scanning UI\nwith progress;
+end fork
+
+repeat :Get next image from queue;
+  
+  |Processing Engine|
+  :Read image file;
+  
+  if (File accessible?) then (No)
+    :Mark as failed;
+    :Log error;
+  else (Yes)
+    :Resize image to 224x224;
+    
+    :Calculate image hash\n(for duplicate detection);
+    
+    partition "AI Analysis" {
+      :Pass image to\nQwen2-VL model;
+      
+      fork
+        :Detect objects;
+        :Generate object list;
+      fork again
+        :Analyze scene;
+        :Determine indoor/outdoor;
+        :Identify location type;
+      fork again
+        :Generate caption;
+        :Create short description;
+        :Create detailed description;
+      fork again
+        :Extract tags;
+        :Generate keywords;
+      fork again
+        :Detect text/characters;
+        :OCR if present;
+      end fork
+      
+      :Combine AI results;
+    }
+    
+    partition "Album Categorization" {
+      if (Contains screenshot keywords?) then (Yes)
+        :Category = "Documents";
+      elseif (Single face + portrait?) then (Yes)
+        :Category = "Selfies";
+      elseif (Multiple faces + event?) then (Yes)
+        :Category = "Events";
+      elseif (Landscape/outdoor?) then (Yes)
+        :Category = "Locations";
+      else (None match)
+        :Category = "Others";
+      endif
+    }
+    
+    partition "Face Recognition" {
+      if (face_recognition installed?) then (Yes)
+        :Detect faces using\ndlib library;
+        
+        if (Faces found?) then (Yes)
+          :Extract face encodings\n(128-d vectors);
+          
+          repeat :Compare with\nexisting faces;
+            
+            if (Match found?\n(distance < 0.6)) then (Yes)
+              :Add to existing person;
+              :Update face album;
+            else (No)
+              :Create new person entry;
+              :Generate new face ID;
+            endif
+          repeat while (More faces?) is (Yes)
+          ->No;
+          
+          :Detect emotions\nfrom faces;
+          
+          :Save to FaceDatabase;
+        endif
+      else (No)
+        :Use Qwen2-VL for\nface count only;
+        note right: Face recognition is optional
+      endif
+    }
+    
+    :Compile metadata object;
+    
+    :Save to SQLite database;
+    
+    |System|
+    :Broadcast result to UI;
+    
+    |User Interface|
+    :Add image to gallery;
+    
+    :Update progress indicator;
+    
+    if (User viewing gallery?) then (Yes)
+      :Show new image\nin real-time;
+    endif
+  endif
+  
+  backward :Increment progress counter;
+
+repeat while (More images in queue?) is (Yes)
+->No;
+
+|Processing Engine|
+:Mark processing as complete;
+
+:Clear processing state;
+
+|System|
+:Send completion notification;
+
+|User Interface|
+if (User in ScanningScreen?) then (Yes)
+  :Show "Processing Complete"\nmessage;
+  
+  :Enable navigation button;
+  
+  |User|
+  :Click "View Gallery";
+  
+  |System|
+  :Navigate to HomePage;
+else (No)
+  :Show desktop notification;
+endif
+
+:Display all processed\nimages in gallery;
+
+stop
+
+note right of "AI Analysis"
+  **Processing Time per Image**
+  • First: 25-30 seconds
+  • Subsequent: 20-25 seconds
+  • Face detection: +2-5 seconds
+end note
+
+note left of "Album Categorization"
+  **Smart Categories**
+  1. Documents (screenshots, text)
+  2. Selfies (single person portraits)
+  3. Events (multiple people, parties)
+  4. Locations (landscapes, travel)
+  5. Others (general photos)
+end note
+
+note right of "Face Recognition"
+  **Face Matching Process**
+  • Extract 128-d encoding
+  • Compare with all existing faces
+  • Threshold: 0.6 for same person
+  • Lower = more similar
+  • Create albums per person
+end note
+
+@enduml

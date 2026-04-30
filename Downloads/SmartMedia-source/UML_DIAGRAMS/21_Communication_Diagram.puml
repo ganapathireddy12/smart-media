@@ -1,0 +1,220 @@
+@startuml Communication Diagram - Auto-Tagging Feature
+!theme cerulean-outline
+
+title SmartMedia - Communication Diagram (Auto-Tagging Collaboration)
+
+object scanner as "ScannerWorker"
+object inferenceEngine as "InferenceEngine\n(Qwen2-VL)"
+object dbController as "DatabaseController"
+object vectorStore as "VectorStore\n(FAISS/Embeddings)"
+object fileSystem as "FileSystem"
+
+scanner -- inferenceEngine: 1. pass image\npath
+scanner -- dbController: 2. query existing\nrecord
+
+scanner -- inferenceEngine: 3. request AI\nprocessing
+inferenceEngine -- vectorStore: 4. pass caption\nfor embedding
+
+inferenceEngine -- scanner: 5. return\ntags + metadata
+
+scanner -- dbController: 6. pass tags,\ncaption, objects
+
+dbController -- fileSystem: 7. save thumbnail\nto disk
+
+scanner -- vectorStore: 8. add vector\nto index
+
+dbController -- fileSystem: 9. commit\nto database
+
+vectorStore -- dbController: 10. confirm\nindex updated
+
+note on link from scanner to inferenceEngine: Model inference\n~2 sec
+
+note on link from inferenceEngine to vectorStore: Generate embedding\n~50ms
+
+note on link from inferenceEngine to scanner: Extract metadata\n~10ms
+
+note on link from scanner to dbController: Insert/update\n~5ms
+
+note on link from dbController to fileSystem: Write thumbnail\n~20ms
+
+note on link from scanner to vectorStore: Add 1536-dim\nvector\n~2ms
+
+note on link from dbController to fileSystem: SQL commit\n~5ms
+
+note on link from vectorStore to dbController: Finish\n~1ms
+
+---
+
+cloud "Auto-Tagging Workflow" {
+  [scanner]
+  [inferenceEngine]
+  [dbController]
+  [vectorStore]
+  [fileSystem]
+}
+
+---
+
+component [Auto-Tagging Pipeline] {
+  interface [Input] as inp <<provided>>
+  interface [Output] as outp <<provided>>
+  
+  inp : file_path : string
+  outp : database_record : ImageRecord
+  
+  interface [Cache] as cache <<required>>
+  interface [GPU] as gpu <<required>>
+}
+
+[Input] -- scanner: provides file
+
+[Auto-Tagging Pipeline] -- [Output]: produces tagged record
+
+[Auto-Tagging Pipeline] -- cache: accesses model cache
+[Auto-Tagging Pipeline] -- gpu: uses GPU acceleration
+
+---
+
+note right of scanner
+  **Scanner Responsibilities:**
+  • Traverse file system
+  • Load image/video/audio
+  • Call inference engine
+  • Pass results to DB
+  • Track progress
+  
+  Triggers: Every ~2 sec
+  Duration: Varies by file
+end note
+
+note right of inferenceEngine
+  **Inference Engine:**
+  • Load model (cached)
+  • Resize image
+  • Forward pass
+  • Extract embeddings
+  • Parse output text
+  
+  Model: Qwen2-VL-2B
+  Device: GPU/CPU
+end note
+
+note right of dbController
+  **Database Controller:**
+  • Check if exists
+  • INSERT or UPDATE
+  • Manage transactions
+  • Handle constraints
+  • Commit to disk
+  
+  Driver: better-sqlite3
+  Pattern: D-DAO
+end note
+
+note right of vectorStore
+  **Vector Store:**
+  • Load FAISS index
+  • Add embedding
+  • Update id_map
+  • Persist to disk
+  • Handle serialization
+  
+  Format: FAISS binary
+  Dimension: 1536
+end note
+
+note right of fileSystem
+  **File System:**
+  • Save thumbnails
+  • Manage paths
+  • Handle cleanup
+  • Permissions
+  • Disk I/O
+  
+  Location: data/thumbnails/
+  Format: JPEG
+end note
+
+---
+
+partition "Message Flow Details" {
+  
+  note
+    **1: Pass image path**
+    From: ScannerWorker
+    To: InferenceEngine
+    Data: {path: string, media_type: str}
+    
+    **2: Query existing record**
+    From: ScannerWorker
+    To: DatabaseController
+    Data: {path: str, id: str}
+    Return: {exists: bool, record: null|ImageRecord}
+    
+    **3: Request AI processing**
+    From: ScannerWorker
+    To: InferenceEngine
+    Data: {image_path: str}
+    
+    **4: Pass caption for embedding**
+    From: InferenceEngine
+    To: VectorStore
+    Data: {text: str, media_id: str}
+    
+    **5: Return tags + metadata**
+    From: InferenceEngine
+    To: ScannerWorker
+    Data: {caption: str, emotion: str, objects: List, scene: str, embedding: ndarray[1536]}
+    
+    **6: Pass tags, caption, objects**
+    From: ScannerWorker
+    To: DatabaseController
+    Data: {id: str, caption: str, tags: List, objects: List, emotion: str, metadata: JSON}
+    
+    **7: Save thumbnail to disk**
+    From: DatabaseController
+    To: FileSystem
+    Data: {image_data: bytes, path: str}
+    
+    **8: Add vector to index**
+    From: ScannerWorker
+    To: VectorStore
+    Data: {id: str, vector: ndarray[1536]}
+    
+    **9: Commit to database**
+    From: DatabaseController
+    To: FileSystem
+    Data: {transaction: begin/commit/rollback}
+    
+    **10: Confirm index updated**
+    From: VectorStore
+    To: DatabaseController
+    Data: {success: bool, vector_count: int}
+  end note
+}
+
+---
+
+partition "Concurrency Model" {
+  note
+    **Thread Safety:**
+    • ScannerWorker: main thread
+    • InferenceEngine: GPU thread (async)
+    • DatabaseController: sync (better-sqlite3)
+    • VectorStore: in-memory (thread-safe)
+    • FileSystem: I/O thread (OS managed)
+    
+    **Synchronization:**
+    • Locks on model loading
+    • DB transactions atomic
+    • FAISS not thread-safe (single update thread)
+    • File system ops serialized
+    
+    **Bottlenecks:**
+    1. Model inference (GPU)
+    2. Database writes (I/O)
+    3. Vector store updates (CPU)
+  end note
+}
+
+@enduml

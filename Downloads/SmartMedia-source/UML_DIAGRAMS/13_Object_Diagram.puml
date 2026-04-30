@@ -1,0 +1,185 @@
+@startuml Object Diagram - SmartMedia Runtime State
+!theme cerulean-outline
+
+title SmartMedia - Object Diagram (Runtime State)
+
+' Objects representing actual instances at runtime
+object "appStoreInstance" as store {
+  currentScreen = "home"
+  images : ImageMetadata[] = []
+  selectedIds = Set<string>
+  discoveredImages : string[] = []
+  scanProgress = {status: "idle", current: 0, total: 0}
+  albums : Album[] = [Documents, Selfies, Events, Locations, Others]
+}
+
+object "pythonEngineInstance" as pyEngine {
+  model = Qwen2VLForConditionalGeneration
+  processor = AutoProcessor
+  device = "cuda" OR "cpu"
+  demo_mode = false
+  db = sqlite3.Connection
+}
+
+object "electronMainInstance" as electronMain {
+  pythonProcess = ChildProcess
+  pythonReady = true
+  db = Database("better-sqlite3")
+  mainWindow = BrowserWindow
+  ipcHandlers = Map<string, Handler>
+}
+
+object "faissIndexInstance" as faissIdx {
+  index = FAISS.IndexFlatL2
+  id_map = {id: vector_offset}
+  dimension = 1536
+  total_vectors = imageCount
+  normalized = true
+}
+
+object "currentScanInstance" as currentScan {
+  status = "analyzing"
+  filePath = "D:/Photos/IMG_001.jpg"
+  mediaType = "image"
+  thumbnail = base64String
+  detectedFaces = 2
+  generatedCaption = "Two people smiling..."
+  processingTime = 2.34
+}
+
+object "selectedImageInstance" as selectedImg {
+  id = "a1b2c3d4"
+  path = "D:/Photos/IMG_001.jpg"
+  filename = "IMG_001.jpg"
+  mediaType = "image"
+  caption = "Beach memories"
+  tags = ["beach", "friends", "sunset"]
+  faces = 2
+  emotion = "happy"
+  isFavorite = true
+  dateScanned = "2024-01-15T14:30:45Z"
+  metadata = {
+    gps: {lat: 40.7128, lon: -74.0060},
+    camera_make: "Apple",
+    camera_model: "iPhone 14 Pro",
+    date_taken: "2024-01-15T12:00:00Z"
+  }
+}
+
+object "activeAlbumInstance" as activeAlbum {
+  id = "album_selfies"
+  name = "Selfies"
+  is_smart_album = true
+  smart_criteria = {
+    photo_type: "selfie",
+    faces: "<= 2"
+  }
+  imageCount = 47
+  coverImageId = "a1b2c3d4"
+  createdAt = "2024-01-01T00:00:00Z"
+}
+
+object "faceClusterInstance" as faceCluster {
+  face_id = "face_001"
+  name = "Unknown Person"
+  encoding = [128-dim float array]
+  imageCount = 15
+  thumbnails = [base64Array...]
+  first_seen = "2024-01-10"
+  confidence = 0.92
+}
+
+object "searchQueryInstance" as searchQuery {
+  text = "sunset beach"
+  vectorized = [1536-dim embedding]
+  results = [{id, similarity_score, path}...]
+  executionTime = 0.45
+}
+
+object "videoPlayerInstance" as videoPlayer {
+  mediaPath = "file://D:/Videos/VID_001.mp4"
+  duration = 45.5
+  currentTime = 12.3
+  isPlaying = true
+  volume = 0.8
+  metadata = {
+    mediaType: "video",
+    thumbnail_path: "data/thumbnails/hash_thumb.jpg"
+  }
+}
+
+object "audioPlayerInstance" as audioPlayer {
+  mediaPath = "file://D:/Music/audio_001.mp3"
+  duration = 180.5
+  currentTime = 45.2
+  isPlaying = false
+  volume = 0.75
+  metadata = {
+    mediaType: "audio",
+    duration: 180.5,
+    thumbnail_path: "data/thumbnails/hash_thumb.jpg"
+  }
+}
+
+' Relationships showing interactions at runtime
+store --> pyEngine : uses
+store --> electronMain : manages state for
+store --> selectedImageInstance : displays
+store --> activeAlbumInstance : filters by
+store --> currentScan : updates during scan
+
+electronMain --> pythonEngineInstance : spawns
+electronMain --> faissIndexInstance : queries
+electronMain --> store : sends updates via IPC
+
+pyEngine --> currentScanInstance : produces
+currentScanInstance --> selectedImageInstance : becomes
+
+faissIndexInstance --> searchQueryInstance : searches
+
+selectedImageInstance --> videoPlayerInstance : renders (if video)
+selectedImageInstance --> audioPlayerInstance : renders (if audio)
+selectedImageInstance --> faceClusterInstance : contains faces
+
+activeAlbum --> selectedImageInstance : contains multiple
+
+note right of store
+  **Global App State (Zustand)**
+  Single source of truth
+  Synced with Electron IPC
+  React components subscribe
+end note
+
+note right of pyEngine
+  **AI Processing Engine**
+  Loaded on app start
+  GPU optimized
+  Processes one file at a time
+  From queue
+end note
+
+note right of currentScan
+  **Current Processing State**
+  Real-time updates sent to UI
+  Progress bar synchronized
+  Data persisted to database
+  after completion
+end note
+
+note right of selectedImageInstance
+  **Displayed Media Metadata**
+  Loaded from database
+  Thumbnails cached
+  Full EXIF data
+  Available for editing
+end note
+
+note right of faissIndexInstance
+  **Vector Search Index**
+  Lazy-loaded on first search
+  In-memory (RAM)
+  Indexes caption embeddings
+  Supports semantic search
+end note
+
+@enduml

@@ -1,0 +1,218 @@
+@startuml State Machine Diagram - MediaItem Lifecycle
+!theme cerulean-outline
+
+title SmartMedia - State Machine Diagram (Media File Lifecycle)
+
+[*] --> New
+
+state New {
+  description: File discovered, not yet processed
+}
+
+New --> Queued : added to processing queue
+note on link
+  Trigger: User scans folder
+  OR drops files
+  Action: Create DB record
+end note
+
+state Queued {
+  description: Waiting for worker thread
+  [*] --> Queued_Ready
+  Queued_Ready --> Queued_Locked : [worker acquired lock]
+}
+
+Queued --> Analyzing : worker thread picks up\n[after queue wait]
+note on link
+  Condition: Worker available
+  Action: Load model
+  (if needed)
+end note
+
+state Analyzing {
+  [*] --> Loading_Image
+  
+  Loading_Image --> Type_Detection : load complete
+  note on link: Detect image/video/audio
+  
+  Type_Detection --> Processing : type determined
+  
+  state Processing {
+    state Processing_Image {
+      [*] --> Resizing
+      Resizing --> VisionEncoding
+      note: Qwen2-VL processing
+      VisionEncoding --> LLMInference
+      LLMInference --> MetadataExtraction
+    }
+    
+    state Processing_Video {
+      [*] --> ExtractDuration
+      ExtractDuration --> ExtractFrame
+      ExtractFrame --> GenerateThumbnail
+    }
+    
+    state Processing_Audio {
+      [*] --> ExtractMetadata
+      ExtractMetadata --> GenerateThumbnail_Audio
+    }
+    
+    Processing_Image --> FaceDetection : [if image]
+    Processing_Video --> FaceDetection : [if has faces]
+    Processing_Audio --> FaceDetection : [never]
+    
+    FaceDetection --> Embedding_Generation
+    Embedding_Generation --> Database_Write
+  }
+  
+  Processing --> Validation : processing complete
+  note on link: Verify results
+  
+  state Validation {
+    [*] --> Validate_Metadata
+    Validate_Metadata --> [*]
+  }
+}
+
+Analyzing --> Indexed : ✅ success\n[data valid]
+note on link
+  Action:
+  • Write to DB
+  • Index embedding
+  • Cache thumbnail
+  • Update index count
+end note
+
+Analyzing --> Error : ❌ failure\n[exception or invalid]
+note on link
+  Cases:
+  • Corrupted file
+  • Unreadable format
+  • Model error
+  • DB constraint
+end note
+
+state Indexed {
+  description: Successfully processed
+}
+
+Indexed --> Reanalize : [re-scan triggered]
+note on link
+  User action: Rescan library
+  OR new model version
+end note
+
+state Error {
+  description: Processing failed
+  [*] --> ErrorLogged
+  ErrorLogged --> ErrorRetryable : {retry_count < 3}
+  ErrorLogged --> ErrorPermanent : {retry_count >= 3}
+}
+
+Error --> Queued : [retry]
+note on link
+  Retry up to 3 times
+  with exponential backoff
+end note
+
+Error --> [*] : [user acknowledges]
+note on link: Manual error handling
+
+state ErrorRetryable {
+  description: Can try again
+}
+
+state ErrorPermanent {
+  description: Won't process
+}
+
+Indexed --> Deleted : [user deletes]
+note on link
+  Action:
+  • Remove from DB
+  • Clean thumbnails
+  • Update indexes
+  • Remove from albums
+end note
+
+state Deleted {
+  description: Marked for deletion
+}
+
+Deleted --> [*]
+
+---
+
+note right of New
+  **New State**
+  • File discovered
+  • ID assigned
+  • Not yet in queue
+  • Metadata: filename, path
+end note
+
+note right of Queued
+  **Queued State**
+  • Added to pool
+  • Waiting for worker
+  • Average wait: 100ms
+  • Can be cancelled
+end note
+
+note right of Analyzing
+  **Analyzing State**
+  • Active processing
+  • Worker busy
+  • Duration: 2-5 sec
+  • UI shows progress
+end note
+
+note right of Indexed
+  **Indexed State**
+  • ✅ Success
+  • In DB
+  • Indexed for search
+  • Ready for use
+  • Stable state
+end note
+
+note right of Error
+  **Error State**
+  • ❌ Processing failed
+  • Logged
+  • Retryable or permanent
+  • User can retry
+  • May auto-retry
+end note
+
+note right of Deleted
+  **Deleted State**
+  • Final state
+  • Moved to trash
+  • Dir removed from DB
+  • Cleanup complete
+end note
+
+---
+
+partition "State Transitions Timing" {
+  note right
+    **Typical Flow:**
+    1. New → immediate (0ms)
+    2. Queued → <100ms (varies)
+    3. Analyzing → 2-5 sec
+    4. Indexed → <10ms (DB write)
+    
+    **Error Cases:**
+    • Bad file → Error (immediate)
+    • Model crash → Error (on exception)
+    • DB locked → Queued (wait)
+    
+    **Concurrent Processing:**
+    • Images concurrently by worker threads
+    • FIFO queue maintained
+    • Each image: independent state machine
+  end note
+}
+
+@enduml

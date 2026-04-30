@@ -1,0 +1,185 @@
+{
+  "name": "smartmedia",
+  "version": "1.0.0",
+  "description": "AI-Powered Media Scanner & Organizer",
+  "main": "dist-electron/main.js",
+  "author": "SmartMedia Team",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.electron.json && vite build",
+    "preview": "vite preview",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "tsc -p tsconfig.electron.json && vite build && electron-builder --win --publish never",
+    "electron:build:dir": "tsc -p tsconfig.electron.json && vite build && electron-builder --win --dir",
+    "electron:build:all": "tsc -p tsconfig.electron.json && vite build && electron-builder -mwl --publish never",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:dir": "npm run build && electron-builder --win --dir",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "icons": "node scripts/generate-icons.js",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
+  },
+  "dependencies": {
+    "archiver": "^6.0.2",
+    "better-sqlite3": "^9.2.2",
+    "electron-store": "^8.1.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.294.0",
+    "masonic": "^4.1.0",
+    "motion": "^12.34.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
+    "react-masonry-css": "^1.0.16",
+    "react-router-dom": "^6.20.0",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/leaflet": "^1.9.21",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1",
+    "electron-rebuild": "^3.2.9",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.8",
+    "vite-plugin-electron": "^0.15.5",
+    "vite-plugin-electron-renderer": "^0.14.5",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.smartmedia.app",
+    "productName": "SmartMedia",
+    "copyright": "Copyright © 2024 SmartMedia Team",
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node",
+      "**/better-sqlite3/build/**",
+      "**/node_modules/better-sqlite3/**"
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "!dist-electron/**/*.d.ts",
+      "!dist-electron/**/*.map",
+      "node_modules/**/*",
+      "!node_modules/.cache/**",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,readme.md,readme,CHANGES,UPGRADING,UPGRADING.md,AUTHORS,CONTRIBUTORS}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples,benchmark,benches}",
+      "!**/node_modules/.bin",
+      "!**/node_modules/*.d.ts",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "python",
+        "to": "python",
+        "filter": ["**/*", "!**/__pycache__/**", "!**/*.pyc"]
+      },
+      {
+        "from": "data",
+        "to": "data",
+        "filter": ["*.json", "README.md"]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "${productName} Setup ${version}.${ext}",
+      "publisherName": "SmartMedia Team",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "menuCategory": "SmartMedia",
+      "shortcutName": "SmartMedia",
+      "license": "LICENSE.txt",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "perMachine": false,
+      "displayLanguageSelector": false,
+      "include": "build/installer.nsh",
+      "differentialPackage": false
+    },
+    "portable": {
+      "artifactName": "${productName} Portable ${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "artifactName": "${productName}-${version}-mac.${ext}"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Graphics",
+      "artifactName": "${productName}-${version}-linux.${ext}",
+      "desktop": {
+        "Name": "SmartMedia",
+        "Comment": "AI-Powered Media Scanner & Organizer",
+        "Categories": "Graphics;Photography;",
+        "StartupWMClass": "SmartMedia"
+      }
+    },
+    "publish": null
+  }
+}

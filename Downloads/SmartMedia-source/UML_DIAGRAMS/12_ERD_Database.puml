@@ -1,0 +1,167 @@
+@startuml Entity Relationship Diagram
+!theme cerulean-outline
+
+title SmartMedia - Database Entity Relationship Diagram
+
+' Define entities
+entity "images" as images {
+  * id : TEXT <<PK>>
+  --
+  * path : TEXT <<UNIQUE>>
+  * filename : TEXT
+  caption : TEXT
+  tags : TEXT (JSON)
+  objects : TEXT (JSON)
+  faces : TEXT (JSON)
+  face_count : INTEGER
+  * metadata : TEXT (JSON)
+  is_favorite : BOOLEAN
+  is_deleted : BOOLEAN
+  is_locked : BOOLEAN
+  scanned_at : TIMESTAMP
+  modified_at : TIMESTAMP
+}
+
+entity "albums" as albums {
+  * id : TEXT <<PK>>
+  --
+  * name : TEXT
+  description : TEXT
+  * is_smart_album : BOOLEAN
+  smart_criteria : TEXT (JSON)
+  cover_image_id : TEXT <<FK>>
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+
+entity "album_images" as album_images {
+  * album_id : TEXT <<PK,FK>>
+  * image_id : TEXT <<PK,FK>>
+  --
+  added_at : TIMESTAMP
+}
+
+entity "faces" as faces {
+  * face_id : TEXT <<PK>>
+  --
+  * name : TEXT
+  thumbnail : TEXT (base64)
+  encoding : BLOB
+  first_seen : TIMESTAMP
+  image_count : INTEGER
+}
+
+entity "face_images" as face_images {
+  * face_id : TEXT <<PK,FK>>
+  * image_id : TEXT <<PK,FK>>
+  --
+  location : TEXT (JSON)
+  emotion : TEXT
+  confidence : REAL
+}
+
+entity "metadata_json" as metadata {
+  album_category : TEXT
+  file_type : TEXT
+  scene : JSON
+  detailed_caption : TEXT
+  objects : JSON Array
+  tags : JSON Array
+  characters : JSON Array
+  processing_time : REAL
+  model : TEXT
+  image_hash : TEXT
+  dimensions : JSON
+}
+
+entity "locker_settings" as locker {
+  * id : INTEGER <<PK>>
+  --
+  pin_hash : TEXT
+  is_enabled : BOOLEAN
+  locked_image_count : INTEGER
+}
+
+entity "user_preferences" as preferences {
+  * id : INTEGER <<PK>>
+  --
+  user_name : TEXT
+  selected_folder : TEXT
+  view_mode : TEXT
+  sidebar_open : BOOLEAN
+  custom_banner : TEXT
+}
+
+' Relationships
+images ||--o{ album_images : "belongs to"
+albums ||--o{ album_images : "contains"
+
+images ||--o{ face_images : "has"
+faces ||--o{ face_images : "appears in"
+
+images ||--o| albums : "cover_image"
+
+images ||--|| metadata : "contains\nJSON field"
+
+images }o--|| locker : "locked images"
+
+note right of images
+  **Primary Table**
+  • Central entity for all media
+  • Stores AI-generated metadata
+  • Indexed by path, scanned_at
+  • Supports full-text search
+end note
+
+note right of metadata
+  **JSON Metadata Structure**
+  Embedded in images.metadata field:
+  {
+    "album_category": "Selfies",
+    "file_type": "portrait",
+    "scene": {"scene": "indoor", ...},
+    "detailed_caption": "...",
+    "objects": ["person", "phone"],
+    "tags": ["selfie", "portrait"],
+    "processing_time": 24.5,
+    "model": "Qwen2-VL-2B"
+  }
+end note
+
+note left of albums
+  **Album Types**
+  1. Smart Albums (AI-generated)
+     • Documents
+     • Selfies
+     • Events
+     • Locations
+     • Others
+  
+  2. Custom Albums (User-created)
+     • Manual organization
+     • Custom names
+end note
+
+note left of faces
+  **Face Recognition**
+  • Stored in separate pickle file
+  • face_id links to images
+  • 128-dimensional encoding
+  • Similarity threshold: 0.6
+end note
+
+note bottom of face_images
+  **Junction Table**
+  Many-to-many relationship
+  One image can have multiple faces
+  One person can appear in many images
+end note
+
+note bottom of album_images
+  **Junction Table**
+  Many-to-many relationship
+  One album can have many images
+  One image can be in multiple albums
+end note
+
+@enduml

@@ -1,0 +1,170 @@
+@startuml Activity Diagram - Scan Pipeline
+!theme cerulean-outline
+
+title SmartMedia - Activity Diagram (Media Scanning & Processing Pipeline)
+
+start
+:📂 **START**: User selects folder;
+:🔍 **Get Folder Path**;
+
+:🔎 Traverse Directory Recursively;
+note right: Walk through all subdirectories
+:📋 Get file list;
+
+while (More files?) is (Yes)
+  :📄 Read next file;
+  :📝 Get file extension;
+  
+  if (Is Image/Video/Audio?) is (No)
+    :⏭️  Skip file;
+    note right: Not a supported media type
+  else (Yes)
+    :🔢 Compute MD5 hash;
+    note right: Used as unique ID
+    
+    if (Already in DB?) is (Yes)
+      :🔗 Link to existing record;
+      note right: File already scanned
+    else (No)
+      
+      :📐 Get file metadata;
+      :📊 Extract: size, modified_date;
+      
+      if (Media Type?) is (Image)
+        :🖼️  Resize image;
+        note right: MAX_IMAGE_SIZE = 256px
+        
+        :🧠 Load Qwen2-VL Model;
+        note right: GPU-accelerated inference
+        
+        :🔄 Generate Prompt;
+        note right: Optimized for fast response
+        :⚡ Run Inference;
+        note right: max_new_tokens = 85
+        :🎨 Extract metadata;
+        note right: caption, emotion, objects
+        
+        :👁️  Detect Faces;
+        note right: HOG detector (fast)
+        :📦 Generate Face Encodings;
+        note right: 128-dim vectors
+        
+        :📐 Check for EXIF data;
+        if (Has GPS?) is (Yes)
+          :🗺️  Extract coordinates;
+          :🌍 Reverse geocode;
+          note right: Optional: call OSM API
+        else (No)
+        endif
+        
+        :🖼️  Generate Thumbnail;
+        note right: Resize to 400x400
+        :💾 Save to disk;
+        
+      else if (Media Type?) is (Video)
+        :🎥 Extract duration;
+        note right: Use OpenCV
+        :🎬 Extract frame @ 10%;
+        note right: Create thumbnail image
+        :🖼️  Generate Thumbnail;
+        :💾 Save to disk;
+        :✅ Mark as video;
+        
+      else if (Media Type?) is (Audio)
+        :🎵 Extract duration;
+        note right: Read audio metadata
+        :🎨 Create gradient thumbnail;
+        note right: Pink-orange gradient
+        :💾 Save to disk;
+        :✅ Mark as audio;
+        
+      endif
+      
+      :📊 Generate Embedding;
+      note right: Sentence-Transformers (1536-dim)
+      
+      :💾 **Save to Database**;
+      note right
+        INSERT or REPLACE:
+        • id, path, filename
+        • caption, emotion, objects
+        • metadata (JSON)
+        • face_count
+        • thumbnail_path
+        • media_type
+        • duration (if video/audio)
+      end note
+      
+      :📑 **Add to FAISS Index**;
+      note right: For semantic search
+      
+      :📤 **Send Progress Update**;
+      note right: IPC to UI with:
+      • current file count
+      • filename
+      • detected_faces
+      • generated_caption
+      
+    endif
+    
+  endif
+  
+endwhile (No)
+
+:✅ **Processing Complete**;
+:📊 Update Library Statistics;
+note right
+  • Total media count
+  • Faces count
+  • Processing time
+  • Storage used
+end note
+
+:🎉 **Scan Finished**;
+note right: User notified via UI
+:Show summary;
+:Offer background processing;
+stop
+
+---
+
+partition "Error Handling" {
+  if (File read error?) is (Yes)
+    :⚠️  Log error;
+    :⏭️  Skip and continue;
+  else (No)
+  endif
+  
+  if (AI inference error?) is (Yes)
+    :⚠️  Log error;
+    :📝 Use fallback: filename only;
+  else (No)
+  endif
+  
+  if (Database error?) is (Yes)
+    :❌ Rollback transaction;
+    :🔔 Notify user;
+  else (No)
+  endif
+}
+
+---
+
+note bottom
+  **Performance Metrics:**
+  • File traversal: O(n) files
+  • Image processing: ~2 sec/image (GPU)
+  • Video thumbnail: ~0.5 sec
+  • Audio metadata: ~0.05 sec
+  • Database write: ~5ms
+  • Total: ~n*2 sec for n images
+  
+  **Optimization Strategies:**
+  ✓ Batch processing (vectorized inference)
+  ✓ GPU acceleration (CUDA)
+  ✓ Caching (skip already scanned)
+  ✓ Background processing (non-blocking)
+  ✓ Token reduction (85 vs 140)
+end note
+
+@enduml

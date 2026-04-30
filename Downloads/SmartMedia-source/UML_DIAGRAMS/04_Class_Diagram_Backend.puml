@@ -1,0 +1,198 @@
+@startuml Backend Class Diagram
+!theme cerulean-outline
+
+title SmartMedia - Backend Class Diagram (Electron & Python)
+
+' Electron Main Process
+class ElectronMain {
+  -mainWindow: BrowserWindow
+  -pythonProcess: ChildProcess
+  -pythonReady: boolean
+  -processingQueue: ProcessingTask[]
+  +createWindow(): void
+  +initializePython(): void
+  +setupIPCHandlers(): void
+  +sendProcessingStatus(): void
+  +handleAppReady(): void
+  +handleAppQuit(): void
+}
+
+class IPCHandlers {
+  +handleGetImages(limit: number): Promise<ImageMetadata[]>
+  +handleProcessImage(imagePath: string): Promise<AIResponse>
+  +handleQueueImages(paths: string[]): Promise<QueueResult>
+  +handleGetFaces(): Promise<Face[]>
+  +handleAIChat(imagePath: string, message: string): Promise<ChatResponse>
+  +handleGetImageThumbnail(path: string): Promise<string>
+}
+
+class ProcessingQueue {
+  -queue: ProcessingTask[]
+  -isProcessing: boolean
+  +addTask(task: ProcessingTask): void
+  +processNext(): void
+  +getStatus(): QueueStatus
+  +clearCompleted(): void
+}
+
+class DatabaseManager {
+  -db: Database
+  +initialize(): void
+  +saveImage(metadata: ImageMetadata): void
+  +getImages(filters: ImageFilters): ImageMetadata[]
+  +updateImage(id: string, updates: Partial<ImageMetadata>): void
+  +deleteImage(id: string): void
+}
+
+' Python AI Engine
+class SmartMediaEngine {
+  -model: Qwen2VLForConditionalGeneration
+  -processor: AutoProcessor
+  -device: string
+  -model_loaded: boolean
+  -face_db: FaceDatabase
+  +load_model(): void
+  +process_image(image_path: string): Dict
+  +detect_faces_in_image(image_path: string): List[Dict]
+  +categorize_into_album(response: Dict): string
+  +get_faces(): List[Dict]
+  +ai_chat(image_path: string, message: string): Dict
+  -_detect_objects(image: Image): List[str]
+  -_generate_caption(image: Image): str
+  -_detect_emotion_from_face(face_image: Image): str
+  -_detect_faces_with_library(image_path: string): List[Dict]
+  -_detect_faces_with_qwen(image_path: string): List[Dict]
+}
+
+class FaceDatabase {
+  -db_path: string
+  -faces: Dict[str, FaceData]
+  -encodings: Dict[str, List[float]]
+  +add_or_update_face(encoding, image_path, location, thumbnail): str
+  +get_all_faces(): List[Dict]
+  +set_face_name(face_id: string, name: string): bool
+  +merge_faces(face_ids: List[str], target_name: string): bool
+  -_load(): void
+  -_save(): void
+  -_generate_id(): str
+}
+
+class ModelDownloader {
+  -model_id: string
+  -cache_dir: string
+  +download_model(): void
+  +check_model_exists(): bool
+  +get_download_progress(): float
+}
+
+class ImageProcessor {
+  +load_image(path: string): Image
+  +resize_image(image: Image, size: tuple): Image
+  +preprocess_for_model(image: Image): Tensor
+  +extract_face_region(image: Image, location: tuple): Image
+  +calculate_image_hash(image: Image): string
+}
+
+' Data Models
+class ProcessingTask {
+  +id: string
+  +imagePath: string
+  +status: 'queued' | 'processing' | 'completed' | 'failed'
+  +result: AIResponse | null
+  +error: string | null
+  +timestamp: number
+}
+
+class AIResponse {
+  +success: boolean
+  +path: string
+  +filename: string
+  +caption: string
+  +detailed_caption: string
+  +tags: string[]
+  +objects: string[]
+  +scene: SceneData
+  +face_count: number
+  +detected_faces: Face[]
+  +emotion: string
+  +album_category: string
+  +file_type: string
+  +processing_time: float
+}
+
+class SceneData {
+  +scene: string
+  +confidence: float
+  +attributes: string[]
+}
+
+class Face {
+  +face_id: string
+  +location: tuple
+  +encoding: List[float]
+  +thumbnail: string
+  +emotion: string
+  +confidence: float
+}
+
+class FaceData {
+  +name: string
+  +images: List[string]
+  +thumbnail: string
+  +first_seen: string
+  +emotions: Dict[string, string]
+}
+
+' Relationships
+ElectronMain "1" *-- "1" IPCHandlers : uses
+ElectronMain "1" *-- "1" ProcessingQueue : manages
+ElectronMain "1" *-- "1" DatabaseManager : uses
+
+ElectronMain "1" --> "1" SmartMediaEngine : spawns
+
+SmartMediaEngine "1" *-- "1" FaceDatabase : uses
+SmartMediaEngine "1" *-- "1" ModelDownloader : uses
+SmartMediaEngine "1" *-- "1" ImageProcessor : uses
+
+ProcessingQueue "1" o-- "many" ProcessingTask : queues
+SmartMediaEngine ..> AIResponse : returns
+FaceDatabase "1" o-- "many" FaceData : stores
+
+AIResponse "1" *-- "1" SceneData : contains
+AIResponse "1" o-- "many" Face : includes
+
+note right of ElectronMain
+  **Main Process Responsibilities**
+  • Window management
+  • IPC communication
+  • Python process lifecycle
+  • File system operations
+  • Database coordination
+end note
+
+note right of SmartMediaEngine
+  **AI Processing Core**
+  • Qwen2-VL model inference
+  • Multi-modal understanding
+  • Face detection & recognition
+  • Album categorization
+  • Natural language chat
+end note
+
+note bottom of FaceDatabase
+  **Face Recognition System**
+  • 128-d face encodings
+  • Similarity matching (< 0.6)
+  • Person grouping
+  • Emotion tracking
+end note
+
+note bottom of ProcessingQueue
+  **Background Processing**
+  • Non-blocking queue
+  • Real-time status updates
+  • Error handling
+  • Progress persistence
+end note
+
+@enduml

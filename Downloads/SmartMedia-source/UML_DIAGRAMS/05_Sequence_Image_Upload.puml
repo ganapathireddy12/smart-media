@@ -1,0 +1,141 @@
+@startuml Sequence Diagram - Image Upload Flow
+!theme cerulean-outline
+
+title SmartMedia - Image Upload & Processing Sequence
+
+actor User
+participant "HomePage" as UI
+participant "AppStore\n(Zustand)" as Store
+participant "Electron\nMain" as Electron
+participant "Processing\nQueue" as Queue
+participant "Python\nEngine" as Python
+participant "Qwen2-VL\nModel" as Model
+participant "Face\nDatabase" as FaceDB
+participant "SQLite\nDatabase" as DB
+
+User -> UI: Click "Add Photos" button
+activate UI
+
+UI -> UI: Create file input\nelement
+
+UI -> User: Show file picker dialog
+User -> UI: Select image files
+activate User
+
+UI -> Store: setDiscoveredImages(filePaths)
+activate Store
+
+Store -> Store: Update discovered\nimages state
+
+UI -> Store: setCurrentScreen('scanning')
+Store -> Store: Update current screen
+
+deactivate Store
+deactivate User
+
+UI -> UI: Navigate to\nScanningScreen
+
+== Scanning & Processing Phase ==
+
+UI -> Electron: processImage(imagePath)
+activate Electron
+
+Electron -> Queue: addTask(imagePath)
+activate Queue
+
+Queue -> Queue: Create ProcessingTask\n{id, path, status: 'queued'}
+
+Queue -> Electron: Task queued
+Electron -> UI: Queued successfully
+
+Queue -> Python: {"action": "process_image",\n"path": imagePath}
+activate Python
+
+Python -> Python: Load image\nResize to 224x224
+
+Python -> Model: Forward pass\n(vision-language inference)
+activate Model
+
+Model -> Model: Extract features\nGenerate embeddings
+
+Model -> Python: Vision features
+deactivate Model
+
+Python -> Python: Extract:\n• Objects\n• Scene\n• Caption\n• Tags
+
+Python -> Python: categorize_into_album()\nDetermine smart album
+
+Python -> Python: detect_faces_in_image()
+activate Python #LightBlue
+
+Python -> FaceDB: Face detection\n& encoding
+activate FaceDB
+
+FaceDB -> FaceDB: Compare with\nexisting faces\n(distance < 0.6)
+
+FaceDB -> FaceDB: Add or update\nface record
+
+FaceDB -> Python: Face IDs &\nlocations
+deactivate FaceDB
+deactivate Python
+
+Python -> Python: Compile AIResponse:\n{\n  caption, tags, objects,\n  album_category, faces\n}
+
+Python -> Electron: JSON response
+deactivate Python
+
+Electron -> DB: saveImage(metadata)
+activate DB
+
+DB -> DB: INSERT INTO images\n(id, path, caption,\n tags, metadata, ...)"
+
+DB -> Electron: Save successful
+deactivate DB
+
+Electron -> Store: addImages([imageMetadata])
+activate Store
+
+Store -> Store: Update images array\nTrigger re-render
+
+Store -> UI: State updated
+deactivate Store
+
+UI -> UI: Update gallery view\nShow new image
+
+deactivate Queue
+
+alt More images in queue
+  Queue -> Queue: Process next image
+  note right: Repeat process for\neach queued image
+else Queue empty
+  Electron -> UI: processing:complete
+  UI -> UI: Show completion\nmessage
+end
+
+deactivate Electron
+
+User -> UI: View processed images\nin gallery
+UI -> User: Display with AI-generated\ncaptions & tags
+
+deactivate UI
+
+note over User, DB
+  **Processing Time**
+  • First image: ~25-30s (model loading)
+  • Subsequent: ~20-25s each
+  • Background processing allows
+    continued UI interaction
+end note
+
+note over Python, Model
+  **AI Analysis Includes**
+  1. Object detection (1000+ classes)
+  2. Scene understanding
+  3. Caption generation
+  4. Tag extraction
+  5. Face detection & recognition
+  6. Emotion detection
+  7. Album categorization
+end note
+
+@enduml

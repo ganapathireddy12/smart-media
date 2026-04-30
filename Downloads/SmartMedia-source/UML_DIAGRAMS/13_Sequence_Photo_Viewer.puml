@@ -1,0 +1,302 @@
+@startuml Sequence Diagram - Photo Viewer Interaction
+!theme cerulean-outline
+
+title SmartMedia - Photo Viewer & Editing Sequence
+
+actor User
+participant "HomePage" as Home
+participant "PhotoViewer\nComponent" as Viewer
+participant "AppStore" as Store
+participant "Electron\nIPC" as IPC
+participant "File System" as FS
+
+User -> Home: Click image in gallery
+activate Home
+
+Home -> Home: Get image metadata\nand index
+
+Home -> Viewer: Open PhotoViewer\n(image, index)
+activate Viewer
+
+Viewer -> Viewer: Load image preview\nfrom cache
+
+Viewer -> User: Display full-screen\nimage with overlay
+deactivate Home
+
+== Basic Viewing ==
+
+User -> Viewer: Press arrow keys /\nclick navigation
+activate User
+
+Viewer -> Viewer: Calculate next/previous\nindex
+
+Viewer -> Store: Get adjacent image
+activate Store
+Store -> Viewer: ImageMetadata
+deactivate Store
+
+Viewer -> Viewer: Update displayed image
+
+Viewer -> User: Show new image\nwith animation
+
+deactivate User
+
+== Metadata Panel ==
+
+User -> Viewer: Click "Info" icon
+activate User
+
+Viewer -> Viewer: Toggle metadata panel
+
+Viewer -> User: Show panel with:\n• Caption\n• Tags\n• Objects\n• Face count\n• Scene\n• Date
+
+User -> Viewer: Click tag chip
+Viewer -> Store: Add tag to search
+activate Store
+Store -> Store: Update searchQuery\nand filters
+deactivate Store
+
+Viewer -> Viewer: Close viewer
+
+Viewer -> Home: Return to gallery\nwith applied filters
+
+deactivate User
+
+== Editing Mode ==
+
+User -> Viewer: Click "Edit" button
+activate User
+
+Viewer -> Viewer: setIsEditing(true)
+
+Viewer -> User: Show editing controls:\n• Brightness\n• Contrast\n• Saturation\n• Sharpness\n• Blur\n• Rotate\n• Flip
+
+User -> Viewer: Adjust brightness slider
+
+Viewer -> Viewer: Update editState
+
+Viewer -> Viewer: Apply CSS filters\nin real-time
+
+Viewer -> User: Show live preview
+
+User -> Viewer: Adjust multiple settings
+
+Viewer -> Viewer: Track all changes\nin editState
+
+User -> Viewer: Click "Save"
+
+Viewer -> Viewer: Check if edits were made
+
+alt User wants to save as copy
+  
+  User -> Viewer: Click "Save as Copy"
+  
+  Viewer -> Store: saveImageAsCopy(\nid, editState)
+  activate Store
+  
+  Store -> Store: Create new ImageMetadata\nwith edited values
+  
+  Store -> Store: Generate new ID\nand filename
+  
+  Store -> IPC: saveImage(newMetadata)
+  activate IPC
+  
+  IPC -> FS: Write to database
+  activate FS
+  
+  FS -> IPC: Success
+  deactivate FS
+  
+  IPC -> Store: Image saved
+  deactivate IPC
+  
+  Store -> Store: Add to images array
+  
+  Store -> Viewer: New image created
+  deactivate Store
+  
+  Viewer -> User: Show "Saved as copy"\nmessage
+  
+else User wants to overwrite original
+  
+  User -> Viewer: Click "Save Original"
+  
+  Viewer -> Viewer: Show confirmation dialog
+  
+  User -> Viewer: Confirm
+  
+  Viewer -> Store: saveImageAsOriginal(\nid, editState)
+  activate Store
+  
+  Store -> Store: Update existing\nImageMetadata
+  
+  Store -> IPC: updateImage(id, edits)
+  activate IPC
+  
+  IPC -> FS: UPDATE database
+  activate FS
+  
+  FS -> IPC: Success
+  deactivate FS
+  
+  IPC -> Store: Updated
+  deactivate IPC
+  
+  Store -> Viewer: Image updated
+  deactivate Store
+  
+  Viewer -> User: Show "Original\noverwritten" message
+  
+end
+
+Viewer -> Viewer: Reset editState\nExit editing mode
+
+deactivate User
+
+== AI Chat Integration ==
+
+User -> Viewer: Click "AI Tools"
+activate User
+
+Viewer -> Viewer: Show AI options:\n• Suggest tags\n• Improve caption\n• Ask question
+
+User -> Viewer: Click "Ask Question"
+
+Viewer -> Viewer: Show text input
+
+User -> Viewer: Type: "What's the\nlocation?"
+
+Viewer -> IPC: aiChat(imagePath,\n"What's the location?")
+activate IPC
+
+IPC -> IPC: Forward to Python engine
+
+IPC -> Viewer: AI response:\n"This appears to be\na beach in Hawaii"
+deactivate IPC
+
+Viewer -> User: Display AI answer\nin chat bubble
+
+deactivate User
+
+== Tag Management ==
+
+User -> Viewer: Click "+" to add tag
+activate User
+
+Viewer -> Viewer: Show tag input field
+
+User -> Viewer: Type "vacation"
+
+Viewer -> Store: updateImage(id,\n{tags: [...tags, "vacation"]})
+activate Store
+
+Store -> IPC: saveImageTags(id, tags)
+activate IPC
+
+IPC -> FS: UPDATE images\nSET tags = ?
+activate FS
+
+FS -> IPC: Success
+deactivate FS
+
+IPC -> Store: Updated
+deactivate IPC
+
+Store -> Viewer: Tags updated
+deactivate Store
+
+Viewer -> Viewer: Update tag chips
+
+Viewer -> User: Show new tag
+
+deactivate User
+
+== Favorite Toggle ==
+
+User -> Viewer: Click heart icon
+activate User
+
+Viewer -> Store: toggleFavorite(imageId)
+activate Store
+
+Store -> Store: Update isFavorite flag
+
+Store -> IPC: updateImage(id,\n{is_favorite: true})
+activate IPC
+
+IPC -> FS: UPDATE database
+activate FS
+
+FS -> IPC: Success
+deactivate FS
+
+IPC -> Store: Updated
+deactivate IPC
+
+Store -> Viewer: Favorite toggled
+deactivate Store
+
+Viewer -> Viewer: Update heart icon\n(filled/unfilled)
+
+Viewer -> User: Show visual feedback
+
+deactivate User
+
+== Delete Image ==
+
+User -> Viewer: Click trash icon
+activate User
+
+Viewer -> Viewer: Show confirmation dialog
+
+User -> Viewer: Confirm deletion
+
+Viewer -> Store: moveToTrash(imageId)
+activate Store
+
+Store -> Store: Move from images[]\nto trashedImages[]
+
+Store -> IPC: deleteImage(id)
+activate IPC
+
+IPC -> FS: UPDATE images\nSET is_deleted = 1
+activate FS
+
+FS -> IPC: Success
+deactivate FS
+
+IPC -> Store: Deleted
+deactivate IPC
+
+Store -> Home: Trigger re-render
+deactivate Store
+
+Viewer -> Viewer: Close viewer
+
+Viewer -> Home: Return to gallery
+deactivate Viewer
+
+Home -> User: Updated gallery\n(image removed)
+
+deactivate User
+
+note over User, Viewer
+  **Keyboard Shortcuts**
+  • ← → : Navigate
+  • ESC : Close viewer
+  • E : Edit mode
+  • F : Toggle favorite
+  • I : Show info
+  • DEL : Delete
+end note
+
+note over Viewer, Store
+  **Non-Destructive Edits**
+  • Original never modified
+    (unless explicitly chosen)
+  • Edit state stored separately
+  • Can save as copy
+  • Undo by closing without saving
+end note
+
+@enduml

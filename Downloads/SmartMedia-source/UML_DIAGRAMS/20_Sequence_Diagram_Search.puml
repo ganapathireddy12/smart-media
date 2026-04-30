@@ -1,0 +1,160 @@
+@startuml Sequence Diagram - Semantic Search Flow
+!theme cerulean-outline
+
+title SmartMedia - Sequence Diagram (Semantic Search Operation)
+
+participant User as user
+participant "SearchBar\n(React)" as searchBar
+participant "HomePage\n(React)" as homePage
+participant "Zustand Store" as store
+participant "Electron Main" as electronMain
+participant "Python Backend\n(main.py)" as pyBackend
+participant "Sentence\nTransformers" as embedding
+participant "FAISS\nIndex" as faiss
+participant "SQLite\nDatabase" as database
+
+autonumber
+
+user -> searchBar: Types "sunset beach"
+note right of searchBar: User enters search query
+activate searchBar
+
+searchBar -> store: updateSearchQuery("sunset beach")
+activate store
+store -> homePage: Notify listeners
+activate homePage
+homePage -> searchBar: Disable search button
+searchBar -> searchBar: Show loading spinner
+deactivate searchBar
+deactivate store
+deactivate homePage
+
+homePage -> electronMain: IPC("search", "sunset beach")
+note right of homePage: Send to Electron main process
+activate electronMain
+
+electronMain -> pyBackend: Send JSON command\n{"action": "search", "query": "sunset beach"}
+note right of electronMain: ZMQ/stdin communication
+activate pyBackend
+
+pyBackend -> embedding: encode("sunset beach")
+note right of pyBackend: Generate query embedding
+activate embedding
+embedding --> pyBackend: vector[1536] (float32)
+deactivate embedding
+
+note over pyBackend: Load FAISS index\n(if not already loaded)
+pyBackend -> faiss: search(query_vector, k=50)
+note right of faiss: Find k nearest neighbors
+activate faiss
+faiss -> faiss: Compute cosine similarity
+faiss -> faiss: Return top 50 results
+faiss --> pyBackend: [(id, similarity_score), ...]
+deactivate faiss
+
+pyBackend -> database: SELECT * FROM images WHERE id IN (result_ids)
+note right of pyBackend: Fetch full metadata\nfor top results
+activate database
+database --> pyBackend: [ImageMetadata...] (50 rows)
+deactivate database
+
+pyBackend -> pyBackend: Rank results by similarity + recency
+note right of pyBackend: Sort by:\n1. Similarity score\n2. Date modified (newer first)
+
+pyBackend --> electronMain: JSON result\n{"results": [...]}
+note right of pyBackend: ~45 total results found
+deactivate pyBackend
+
+electronMain -> electronMain: Parse JSON results
+electronMain --> homePage: IPC return\n{results: [...], total: 45}
+deactivate electronMain
+
+homePage -> store: updateSearchResults([...])
+note right of homePage: Update app state
+activate store
+store -> homePage: Notify listeners\n(Re-render gallery)
+deactivate store
+
+homePage -> homePage: Filter gallery by results
+note right of homePage: Show only matching images\nin grid layout
+
+searchBar -> searchBar: Hide loading spinner
+searchBar -> searchBar: Enable search button
+
+user -> homePage: Clicks on image
+note right of user: User selects result
+activate homePage
+homePage -> store: setSelectedImage(image)
+activate store
+store --> homePage: Open PhotoViewer
+deactivate store
+deactivate homePage
+
+homePage -> user: Display full image viewer
+note right of homePage: Show caption, metadata,\nAI tags
+
+user -> searchBar: Clear search
+note right of user: Or type new query
+searchBar -> store: clearSearch()
+activate store
+store -> homePage: Show all images
+deactivate store
+
+---
+
+partition "Performance Notes" {
+  note right of pyBackend
+    **Search Timeline:**
+    • embed query: ~50ms
+    • load FAISS: ~100ms (cached after first)
+    • FAISS search: ~20ms (50 neighbors)
+    • DB fetch: ~30ms (50 rows)
+    • Ranking: ~5ms
+    • Total: ~205ms (subsequent searches ~105ms)
+    
+    **Optimization:**
+    ✓ FAISS cached in RAM
+    ✓ Index pre-computed at scan time
+    ✓ Parallel queries possible
+    ✓ Results paginated
+  end note
+}
+
+---
+
+partition "Error Handling" {
+  alt Search Failed
+    pyBackend ->> electronMain: {"success": false, "error": "..."}
+    electronMain ->> homePage: IPC return with error
+    homePage ->> user: Display error message
+  else FAISS not loaded
+    pyBackend ->> pyBackend: Generate index from DB embeddings
+    note right: First search takes longer
+    pyBackend ->> faiss: Index generated
+  else Empty Results
+    pyBackend --> electronMain: {"results": [], "total": 0}
+    electronMain --> homePage: Empty results
+    homePage --> user: "No matches found"
+  end
+}
+
+note bottom
+  **Search Flow Summary:**
+  1. User types in SearchBar
+  2. React state updated via Zustand
+  3. IPC message sent to Electron
+  4. Python vectorizes query (Sentence-Transformers)
+  5. FAISS similarity search (fast, GPU-optimized)
+  6. SQL fetch full metadata for results
+  7. Results ranked and returned
+  8. UI re-renders gallery filtered to results
+  9. User can click to view, share, or tag
+  
+  **Key Features:**
+  • Semantic (meaning-based) not keyword-based
+  • Fast: <200ms end-to-end
+  • Accurate: pre-computed embeddings
+  • Scalable: FAISS is production-grade
+end note
+
+@enduml

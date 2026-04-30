@@ -1,0 +1,299 @@
+@startuml Interaction Overview Diagram - First Run Experience
+!theme cerulean-outline
+
+title SmartMedia - Interaction Overview Diagram (First Run Experience)
+
+rectangle "First Run Experience Flow" {
+  
+  (*) --> [User launches app] FRE_START
+  
+  note on link
+    App starts for first time
+    No prior data detected
+  end note
+  
+  FRE_START --> WELCOME
+  
+  rectangle WELCOME #E6F3FF {
+    note
+      **Welcome Screen**
+      • App branding
+      • Brief description
+      • "Get Started" button
+      Duration: ~5 sec (user reads)
+    end note
+  }
+  
+  WELCOME --> FOLDER_SELECT
+  
+  rectangle FOLDER_SELECT #FFE6E6 {
+    note
+      **Select Library Folder**
+      • File picker dialog
+      • User navigates to Photos folder
+      • Confirm selection
+      Duration: ~10 sec (user interaction)
+    end note
+  }
+  
+  FOLDER_SELECT --> DB_INIT
+  
+  rectangle DB_INIT #E6FFE6 {
+    note
+      **Initialize Database**
+      • Create SQLite DB
+      • Create schema (tables)
+      • Create indexes
+      Duration: < 100ms
+    end note
+  }
+  
+  DB_INIT --> SCAN_PREP
+  
+  rectangle SCAN_PREP #FFF9E6 {
+    note
+      **Prepare Scanner**
+      • Check folder access
+      • Verify Python backend
+      • Load models (async)
+      Duration: 2-5 sec (GPU load)
+    end note
+  }
+  
+  SCAN_PREP --> SCAN_START
+  
+  rectangle SCAN_START #FFD700 {
+    note
+      **Start Scanning**
+      • Traverse directory
+      • Find media files
+      • Calculate total count
+      Duration: < 500ms
+    end note
+  }
+  
+  SCAN_START --> SCAN_ACTIVE
+  
+  rectangle SCAN_ACTIVE #FFA07A {
+    note
+      **Scanning & Processing**
+      
+      Activity Diagram Integration:
+      └─ Traverse Dir
+         ├─ Load Image
+         ├─ AI Processing (2 sec)
+         ├─ Extract Faces
+         ├─ Generate Embedding
+         └─ Save to DB
+      
+      For each image (sequential):
+      • Processing time: ~2 sec/image
+      • Progress updates: every 100ms
+      
+      Sequence Diagram Fragment:
+      └─ Scanner → InferenceEngine
+         └─ InferenceEngine → Database
+      
+      Duration: N * 2 sec
+      (where N = number of images)
+    end note
+  }
+  
+  SCAN_ACTIVE --> {optional}
+    CAN_PAUSE
+  }}
+  
+  rectangle CAN_PAUSE #E6F3FF {
+    note
+      **Pause/Resume Available**
+      • "Pause Scan" button
+      • "Background Process" option
+      • Current progress visible
+      
+      Case 1: Continue
+      → Returns to SCAN_ACTIVE
+      
+      Case 2: Process in Background
+      → Jump to SCAN_COMPLETE
+    end note
+  }
+  
+  CAN_PAUSE --> SCAN_MONITOR
+  
+  rectangle SCAN_MONITOR #FFE6E6 {
+    note
+      **Monitor Progress**
+      
+      State Machine Fragment:
+      • Each file: New → Queued → Analyzing → Indexed
+      
+      Progress Bar Shows:
+      • Current: 25/100 images
+      • Percentage: 25%
+      • ETA: 2 minutes 30 sec
+      • Status: "Processing Image 25..."
+      
+      Timing Constraint:
+      • UI updates every 100ms max
+      • Must stay responsive
+    end note
+  }
+  
+  SCAN_MONITOR --> [All images processed?]
+  
+  [All images processed?] --> SCAN_COMPLETE: Yes
+  [All images processed?] --> BACKGROUND_OPT: No\n(Stop user interaction)
+  
+  rectangle SCAN_COMPLETE #E6FFE6 {
+    note
+      **Scan Completed**
+      • Total images counted
+      • Faces detected summary
+      • Storage used
+      
+      Example Output:
+      • "1,234 photos imported"
+      • "567 faces detected"
+      • "2.3 GB used"
+      
+      Duration: instant
+    end note
+  }
+  
+  rectangle BACKGROUND_OPT #FFF9E6 {
+    note
+      **Option to Process in Background**
+      • "View Gallery" → Go to home
+      • "Continue Processing" → Process remaining
+      
+      If user chooses "View Gallery":
+      ✓ App stays responsive
+      ✓ Processing continues silently
+      ✓ Progress accessible from sidebar
+      
+      Message Flow:
+      └─ UI → Python Backend
+         └─ Queue remaining images
+         └─ Return immediately
+    end note
+  }
+  
+  BACKGROUND_OPT --> [User choice?]
+  [User choice?] --> CONTINUE_SCAN: Continue\nProcessing
+  [User choice?] --> SHOW_GALLERY: View Gallery
+  
+  CONTINUE_SCAN --> SCAN_MONITOR: Resume loop
+  
+  SHOW_GALLERY --> SETUP_COMPLETE
+  
+  SCAN_COMPLETE --> SETUP_COMPLETE: [User confirms]
+  
+  rectangle SETUP_COMPLETE #E6FFE6 {
+    note
+      **Setup Complete**
+      • Database ready
+      • Models loaded
+      • Initial scan done
+      • Albums generated
+      • Ready for use
+      
+      Background tasks may still be running:
+      • Additional images queued
+      • Face clustering background
+      • Index optimization
+      
+      Impact: None (transparent)
+    end note
+  }
+  
+  SETUP_COMPLETE --> HOME_PAGE
+  
+  rectangle HOME_PAGE #90EE90 {
+    note
+      **Home Page (Gallery)**
+      • Gallery grid displayed
+      • Images thumbnails loaded
+      • Albums visible
+      • Search ready
+      • Real-time progress widget
+      
+      If background processing active:
+      • "Processing: 23/100" indicator
+      • Can pause or resume
+      • Doesn't block interactions
+    end note
+  }
+  
+  HOME_PAGE --> (*): [First Run Complete]
+  
+  note on link
+    User can now:
+    ✓ Browse gallery
+    ✓ Search by text/semantic
+    ✓ View albums
+    ✓ Tag photos
+    ✓ Detect faces
+    ✓ Chat with library
+  end note
+}
+
+---
+
+partition "Error Paths" {
+  rectangle "Error Handling" #FFB6C6 {
+    note
+      **If Folder Selection Failed**
+      └─ Show error dialog
+      └─ Return to FOLDER_SELECT
+      
+      **If Database Init Failed**
+      └─ Show warning
+      └─ Try recovery
+      └─ Offer reset
+      
+      **If Model Load Failed**
+      └─ Continue with CPU
+      └─ Slower processing
+      └─ Show warning
+      
+      **If Image Processing Fails**
+      └─ Skip and log error
+      └─ Continue with next
+      └─ User notified at end
+    end note
+  }
+}
+
+---
+
+partition "Performance Timeline" {
+  note bottom
+    **First Run Time Breakdown:**
+    
+    Welcome → Select Folder: 15 sec
+    DB Initialization: 0.1 sec
+    Scanner Prep: 5 sec
+    Scan Directory: 0.5 sec
+    Process Batch (100 images): 200 sec
+    Setup Complete: 0.1 sec
+    =================================
+    Total (blocking): ~25 sec
+    
+    **With Background Processing:**
+    Scan ~50 images: 100 sec (blocking)
+    Remaining 50: Background (transparent to user)
+    
+    User gets to gallery in: ~120 sec
+    Full completion: ~200 sec (background)
+    
+    **User Experience:**
+    1. Launch → Welcome (instant)
+    2. Select folder (manual ~10 sec)
+    3. Wait for models (5 sec, can see loading)
+    4. See gallery (100-200 sec depending on choice)
+    5. Background completes silently
+    6. All ready (notifications when done)
+  end note
+}
+
+@enduml

@@ -1,0 +1,138 @@
+@startuml Use Case Diagram
+!theme cerulean-outline
+
+left to right direction
+skinparam packageStyle rectangle
+
+title SmartMedia - Use Case Diagram
+
+actor "User" as User
+actor "System Administrator" as Admin
+
+rectangle "SmartMedia Application" {
+  ' Image Management
+  package "Image Management" {
+    usecase (Add Photos) as UC1
+    usecase (View Gallery) as UC2
+    usecase (Search Images) as UC3
+    usecase (Filter by Tags) as UC4
+    usecase (Delete Images) as UC5
+    usecase (Restore from Trash) as UC6
+    usecase (Set as Favorite) as UC7
+  }
+  
+  ' AI Features
+  package "AI Features" {
+    usecase (Scan Images) as UC8
+    usecase (Generate Captions) as UC9
+    usecase (Detect Objects) as UC10
+    usecase (Recognize Faces) as UC11
+    usecase (Detect Emotions) as UC12
+    usecase (Chat with AI) as UC13
+  }
+  
+  ' Organization
+  package "Organization" {
+    usecase (View Smart Albums) as UC14
+    usecase (Create Custom Album) as UC15
+    usecase (Add to Album) as UC16
+    usecase (View by Emotion) as UC17
+    usecase (View Faces) as UC18
+    usecase (Name People) as UC19
+  }
+  
+  ' Editing & Privacy
+  package "Editing & Privacy" {
+    usecase (Edit Image) as UC20
+    usecase (Apply Filters) as UC21
+    usecase (Export Image) as UC22
+    usecase (Lock Images) as UC23
+    usecase (Unlock Locker) as UC24
+  }
+  
+  ' Settings
+  package "Settings" {
+    usecase (Configure App) as UC25
+    usecase (Manage Models) as UC26
+    usecase (Reset Application) as UC27
+  }
+}
+
+' External Systems
+actor "Python AI Engine" as AIEngine
+actor "File System" as FileSystem
+database "SQLite Database" as Database
+
+' User connections
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+User --> UC6
+User --> UC7
+User --> UC8
+User --> UC13
+User --> UC14
+User --> UC15
+User --> UC16
+User --> UC17
+User --> UC18
+User --> UC19
+User --> UC20
+User --> UC21
+User --> UC22
+User --> UC23
+User --> UC24
+
+' Admin connections
+Admin --> UC25
+Admin --> UC26
+Admin --> UC27
+
+' Include relationships
+UC8 ..> UC9 : <<include>>
+UC8 ..> UC10 : <<include>>
+UC8 ..> UC11 : <<include>>
+UC8 ..> UC12 : <<include>>
+
+UC2 ..> UC4 : <<extend>>
+UC2 ..> UC7 : <<extend>>
+
+UC18 ..> UC19 : <<extend>>
+
+UC20 ..> UC21 : <<include>>
+UC20 ..> UC22 : <<extend>>
+
+UC23 ..> UC24 : <<precedes>>
+
+' System dependencies
+UC8 --> AIEngine
+UC9 --> AIEngine
+UC10 --> AIEngine
+UC11 --> AIEngine
+UC12 --> AIEngine
+UC13 --> AIEngine
+
+UC1 --> FileSystem
+UC5 --> FileSystem
+UC22 --> FileSystem
+
+UC2 --> Database
+UC3 --> Database
+UC14 --> Database
+UC15 --> Database
+
+note bottom of User
+  Primary actor who uses
+  the application for
+  organizing photos
+end note
+
+note bottom of AIEngine
+  Qwen2-VL model processes
+  images and responds to
+  user queries
+end note
+
+@enduml

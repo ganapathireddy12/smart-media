@@ -1,0 +1,169 @@
+@startuml Package Diagram - SmartMedia Architecture
+!theme cerulean-outline
+
+title SmartMedia - Package Diagram (System Architecture)
+
+' Define packages
+package "Frontend" <<Rect>> #FFE6E6 {
+  package "React Components" <<Folder>> {
+    [HomePage]
+    [PhotoViewer]
+    [ScanningScreen]
+    [AlbumsPage]
+    [SearchPage]
+    [SettingsPage]
+  }
+  
+  package "State Management" <<Folder>> {
+    [Zustand Store\n(appStore.ts)]
+    [useImageCache Hook]
+    [useSearchQuery Hook]
+  }
+  
+  package "UI Framework" <<Folder>> {
+    [Framer Motion\n(Animations)]
+    [Lucide Icons]
+    [Tailwind CSS]
+    [Masonic Grid]
+  }
+}
+
+package "Electron Bridge" <<Rect>> #E6F3FF {
+  package "IPC Protocol" <<Folder>> {
+    [Main Process\n(main.ts)]
+    [IPC Handlers\n(Database, File, AI)]
+    [Process Management]
+    [Window Management]
+  }
+  
+  package "Database Access" <<Folder>> {
+    [better-sqlite3\nDriver]
+    [Schema Definitions]
+    [Migration System]
+  }
+  
+  package "File Operations" <<Folder>> {
+    [File Scanner]
+    [Thumbnail Generator]
+    [Metadata Extractor]
+  }
+}
+
+package "Python AI Backend" <<Rect>> #E6FFE6 {
+  package "Model Layers" <<Folder>> {
+    [Vision Encoder\n(Qwen2-VL)]
+    [Tokenizer]
+    [LLM Head]
+  }
+  
+  package "Processing Pipeline" <<Folder>> {
+    [Image Processor]
+    [Video Processor]
+    [Audio Processor]
+    [Face Detector]
+  }
+  
+  package "AI Services" <<Folder>> {
+    [Semantic Embedding\n(Sentence-Transformers)]
+    [FAISS Index\nManager]
+    [Face Recognition\nClusterer]
+    [Metadata Parser]
+  }
+  
+  package "Data Persistence" <<Folder>> {
+    [SQLite3\nDatabase]
+    [Pickle Files\n(Face DB)]
+    [FAISS Index\nFiles]
+  }
+}
+
+package "External Services" <<Rect>> #FFF9E6 {
+  [OpenAI/Transformers API]
+  [Windows Media Foundation\n(Video Codecs)]
+  [Reverse Geocoding API\n(Maps)]
+  [HuggingFace Model Hub]
+}
+
+package "Operating System" <<Rect>> #F0E6FF {
+  [Windows File System]
+  [GPU/CUDA Drivers]
+  [System Memory/Cache]
+}
+
+' Dependencies between packages
+[HomePage] ..> [Zustand Store\n(appStore.ts)] : updates/reads state
+[ScanningScreen] ..> [Zustand Store\n(appStore.ts)] : listens to progress
+[PhotoViewer] ..> [Zustand Store\n(appStore.ts)] : reads image data
+
+[Zustand Store\n(appStore.ts)] --> [Main Process\n(main.ts)] : IPC requests
+
+[Main Process\n(main.ts)] --> [File Scanner] : triggers scan
+[Main Process\n(main.ts)] --> [better-sqlite3\nDriver] : queries/updates DB
+
+[Main Process\n(main.ts)] ..> [Image Processor] : sends image for AI
+[Main Process\n(main.ts)] ..> [Video Processor] : sends video for processing
+[Main Process\n(main.ts)] ..> [Face Detector] : triggers face scan
+
+[File Scanner] --> [Thumbnail Generator] : for discovered files
+[Thumbnail Generator] --> [better-sqlite3\nDriver] : stores paths
+
+[Image Processor] --> [Vision Encoder\n(Qwen2-VL)] : feeds tensors
+[Image Processor] --> [Semantic Embedding\n(Sentence-Transformers)] : encodes captions
+[Image Processor] --> [SQLite3\nDatabase] : stores results
+
+[Face Detector] --> [Face Recognition\nClusterer] : raw detections
+[Face Recognition\nClusterer] --> [Pickle Files\n(Face DB)] : persists encodings
+
+[Semantic Embedding\n(Sentence-Transformers)] --> [FAISS Index\nManager] : indexes vectors
+[FAISS Index\nManager] --> [FAISS Index\nFiles] : persists index
+
+[Main Process\n(main.ts)] ..> [Reverse Geocoding API\n(Maps)] : GPS coordinates
+[Main Process\n(main.ts)] ..> [Windows Media Foundation\n(Video Codecs)] : plays videos
+
+[Video Processor] --> [Windows Media Foundation\n(Video Codecs)] : extracts frames
+[Video Processor] --> [SQLite3\nDatabase] : stores duration/metadata
+
+[File Scanner] --> [Windows File System] : traverses folders
+[Thumbnail Generator] --> [GPU/CUDA Drivers] : image processing
+[Vision Encoder\n(Qwen2-VL)] --> [GPU/CUDA Drivers] : model inference
+[Face Detector] --> [GPU/CUDA Drivers] : face encoding
+
+note right of "Frontend"
+  **React + TypeScript**
+  • Component-based UI
+  • Real-time state sync
+  • Image grid gallery
+  • Media player integration
+end note
+
+note right of "Electron Bridge"
+  **Multi-IPC Layer**
+  • Electron Main Process
+  • Better-SQLite3 (sync DB)
+  • File I/O operations
+  • ZMQ for Python comms
+end note
+
+note right of "Python AI Backend"
+  **PyTorch + Transformers**
+  • Vision-Language Model
+  • Face Recognition
+  • Embedding generation
+  • Database persistence
+end note
+
+note right of "External Services"
+  **Third-party integrations**
+  • Model downloads
+  • Geocoding
+  • Media decoding
+end note
+
+note bottom of "Operating System"
+  **System Resources**
+  • GPU acceleration
+  • File I/O
+  • Memory management
+end note
+
+@enduml

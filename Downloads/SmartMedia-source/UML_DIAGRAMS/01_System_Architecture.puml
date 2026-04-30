@@ -1,0 +1,105 @@
+@startuml System Architecture Diagram
+!define RECTANGLE class
+
+skinparam backgroundColor #1e1e1e
+skinparam shadowing false
+skinparam defaultFontColor white
+skinparam defaultFontSize 12
+
+skinparam package {
+  BackgroundColor #2d2d30
+  BorderColor #007acc
+  FontColor white
+}
+
+skinparam component {
+  BackgroundColor #1e3a5f
+  BorderColor #00bfff
+  FontColor white
+}
+
+title SmartMedia - System Architecture
+
+package "Presentation Layer" #2d2d30 {
+  component [React UI\n(TypeScript)] as ReactUI #1e3a5f
+  component [Framer Motion\n(Animations)] as FramerMotion #1e3a5f
+  component [Zustand Store\n(State Management)] as Zustand #1e3a5f
+  
+  ReactUI -down-> Zustand : "State updates"
+  ReactUI -right-> FramerMotion : "Animations"
+}
+
+package "Application Layer" #2d2d30 {
+  component [Electron Main Process] as ElectronMain #1e3a5f
+  component [IPC Bridge\n(Preload Script)] as IPC #1e3a5f
+  component [File System Manager] as FileSystem #1e3a5f
+  component [Window Manager] as WindowMgr #1e3a5f
+  
+  ElectronMain -down-> IPC : "Secure communication"
+  ElectronMain --> FileSystem : "File operations"
+  ElectronMain --> WindowMgr : "Window control"
+}
+
+package "AI Processing Layer" #2d2d30 {
+  component [Python Engine\n(stdin/stdout)] as PythonEngine #1e3a5f
+  component [Qwen2-VL Model\n(4GB)] as Qwen2VL #1e3a5f
+  component [Face Recognition\n(Optional)] as FaceRec #1e3a5f
+  component [Image Processor] as ImageProc #1e3a5f
+  
+  PythonEngine --> Qwen2VL : "Model inference"
+  PythonEngine --> FaceRec : "Face detection"
+  PythonEngine --> ImageProc : "Image preprocessing"
+}
+
+package "Data Layer" #2d2d30 {
+  database "SQLite Database\n(Metadata)" as SQLite #1e3a5f
+  database "Face Database\n(Pickle)" as FaceDB #1e3a5f
+  storage "File System\n(User Media)" as UserMedia #1e3a5f
+  
+  SQLite -[hidden]right- FaceDB
+  FaceDB -[hidden]right- UserMedia
+}
+
+' Connections between layers
+ReactUI -down-> IPC : "API calls"
+IPC -down-> ElectronMain : "IPC messages"
+
+ElectronMain -down-> PythonEngine : "JSON commands"
+ElectronMain -down-> SQLite : "Database queries"
+ElectronMain -down-> UserMedia : "File access"
+
+PythonEngine -down-> FaceDB : "Face storage"
+ImageProc -down-> UserMedia : "Read images"
+
+' Return paths
+PythonEngine -up-> ElectronMain : "JSON responses"
+SQLite -up-> ElectronMain : "Query results"
+ElectronMain -up-> IPC : "Results"
+IPC -up-> ReactUI : "State updates"
+
+note right of ReactUI
+  **Frontend Tech Stack**
+  • React 18.2 + TypeScript
+  • Tailwind CSS 3.3
+  • Vite 5.0
+  • Framer Motion 10.16
+end note
+
+note right of PythonEngine
+  **AI Capabilities**
+  • Object detection
+  • Scene understanding
+  • Caption generation
+  • Face recognition
+  • Emotion detection
+end note
+
+note right of SQLite
+  **Stored Data**
+  • Image metadata
+  • Tags & captions
+  • Album associations
+  • User preferences
+end note
+
+@enduml

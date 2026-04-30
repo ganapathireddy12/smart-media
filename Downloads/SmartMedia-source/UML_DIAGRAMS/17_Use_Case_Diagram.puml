@@ -1,0 +1,124 @@
+@startuml SmartMedia_UseCase_Diagram
+!theme cerulean-outline
+
+title SmartMedia - Use Case Diagram (User-Centric Functionality)
+
+left to right direction
+skinparam packageStyle rectangle
+
+' Actors
+actor User
+actor "Admin/Power User" as PowerUser
+actor "System/Scheduler" as Scheduler
+
+package "SmartMedia Use Cases" {
+  
+  ' Media Import Use Cases
+  usecase "Import Folder" as UC_ImportFolder
+  usecase "Add Individual Media" as UC_AddMedia
+  usecase "Re-scan Library" as UC_Rescan
+  
+  ' Organization Use Cases
+  usecase "Browse Gallery" as UC_BrowseGallery
+  usecase "View Albums" as UC_ViewAlbums
+  usecase "Create Custom Album" as UC_CreateAlbum
+  usecase "Tag Media" as UC_TagMedia
+  
+  ' Search & Discovery
+  usecase "Full-Text Search" as UC_FullTextSearch
+  usecase "Semantic Search" as UC_SemanticSearch
+  usecase "Vectorize Query" as UC_Vectorize
+  usecase "View Timeline" as UC_Timeline
+  
+  ' Face Recognition
+  usecase "Detect Faces" as UC_DetectFaces
+  usecase "Name Faces" as UC_NameFaces
+  usecase "Find by Face" as UC_FindByFace
+  
+  ' AI Features
+  usecase "AI Chat" as UC_Chat
+  usecase "Auto-Generate Metadata" as UC_AutoMetadata
+  usecase "Auto-Organize Albums" as UC_AutoAlbums
+  
+  ' Export/Sharing
+  usecase "Export Media" as UC_Export
+  usecase "Share Media" as UC_Share
+  usecase "Export Metadata" as UC_ExportMetadata
+  
+  ' Settings & Management
+  usecase "Configure AI" as UC_ConfigAI
+  usecase "Manage Library" as UC_ManageLib
+  usecase "View Statistics" as UC_Stats
+  
+  ' Locker Feature
+  usecase "Private Locker" as UC_Locker
+  
+  ' Background Operations
+  usecase "Background Processing" as UC_BackgroundProc
+}
+
+' User interactions
+User --> UC_ImportFolder
+User --> UC_AddMedia
+User --> UC_BrowseGallery
+User --> UC_ViewAlbums
+User --> UC_CreateAlbum
+User --> UC_TagMedia
+User --> UC_FullTextSearch
+User --> UC_SemanticSearch
+User --> UC_Timeline
+User --> UC_DetectFaces
+User --> UC_NameFaces
+User --> UC_FindByFace
+User --> UC_Chat
+User --> UC_Export
+User --> UC_Share
+User --> UC_Stats
+User --> UC_Locker
+
+PowerUser --> UC_ConfigAI
+PowerUser --> UC_ManageLib
+PowerUser --> UC_ExportMetadata
+PowerUser --> UC_BackgroundProc
+PowerUser --> UC_Rescan
+
+Scheduler --> UC_BackgroundProc
+Scheduler --> UC_DetectFaces
+
+' Use case relationships
+UC_ImportFolder ..> UC_AutoMetadata : <<trigger>>
+UC_AddMedia ..> UC_AutoMetadata : <<trigger>>
+UC_Rescan ..> UC_AutoMetadata : <<trigger>>
+
+UC_AutoMetadata ..> UC_AutoAlbums : <<include>>
+UC_AutoMetadata ..> UC_DetectFaces : <<include>>
+
+UC_Chat ..> UC_FullTextSearch : <<extend>>
+UC_SemanticSearch ..> UC_Vectorize : <<include>>
+UC_Chat ..> UC_SemanticSearch : <<extend>>
+
+UC_BrowseGallery ..> UC_TagMedia : <<include>>
+UC_BrowseGallery ..> UC_AutoMetadata : <<include>>
+
+UC_FindByFace ..> UC_NameFaces : <<include>>
+UC_ExportMetadata ..> UC_Export : <<extend>>
+
+' Notes for details
+note right of UC_SemanticSearch
+  High-value feature
+  Uses FAISS indexing
+end note
+
+note right of UC_AutoMetadata
+  Central processing
+  GPU-accelerated
+end note
+
+note bottom of "SmartMedia Use Cases"
+  **Key User Workflows:**
+  1. Import → Auto-Metadata → Browse
+  2. Search → Results → Chat/Export
+  3. Detect Faces → Name → Find by Face
+end note
+
+@enduml

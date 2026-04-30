@@ -1,0 +1,190 @@
+@startuml State Diagram - Image Processing States
+!theme cerulean-outline
+
+title SmartMedia - Image Processing State Machine
+
+[*] --> Discovered : User selects files
+
+state Discovered {
+  [*] --> Pending
+  Pending : File path stored
+  Pending : Not yet processed
+}
+
+Discovered --> Queued : Add to processing queue
+
+state Queued {
+  [*] --> Waiting
+  Waiting : In processing queue
+  Waiting : Position: N of M
+  Waiting --> Priority : User marks as priority
+  Priority --> Waiting : Other image prioritized
+}
+
+Queued --> Processing : Queue system picks\nnext task
+
+state Processing {
+  [*] --> LoadingImage
+  
+  LoadingImage : Read file from disk
+  LoadingImage : Verify format
+  LoadingImage --> Preprocessing : File valid
+  LoadingImage --> Failed : File error
+  
+  Preprocessing : Resize to 224x224
+  Preprocessing : Convert to RGB
+  Preprocessing : Calculate hash
+  Preprocessing --> AIInference
+  
+  state AIInference {
+    [*] --> ModelLoading
+    ModelLoading : Load Qwen2-VL\n(first image only)
+    ModelLoading --> VisionAnalysis : Model ready
+    
+    VisionAnalysis : Extract features
+    VisionAnalysis : Detect objects
+    VisionAnalysis : Analyze scene
+    VisionAnalysis --> CaptionGeneration
+    
+    CaptionGeneration : Generate short caption
+    CaptionGeneration : Generate detailed description
+    CaptionGeneration --> TagExtraction
+    
+    TagExtraction : Extract keywords
+    TagExtraction : Classify content
+    TagExtraction --> [*]
+  }
+  
+  AIInference --> FaceDetection : AI complete
+  
+  state FaceDetection {
+    [*] --> CheckLibrary
+    CheckLibrary : face_recognition installed?
+    CheckLibrary --> LibraryDetection : Yes
+    CheckLibrary --> QwenFallback : No
+    
+    LibraryDetection : dlib face detection
+    LibraryDetection : Extract 128-d encodings
+    LibraryDetection --> FaceMatching
+    
+    QwenFallback : Use Qwen2-VL for count
+    QwenFallback : No face matching
+    QwenFallback --> [*]
+    
+    FaceMatching : Compare with existing faces
+    FaceMatching : Distance < 0.6 = match
+    FaceMatching --> EmotionDetection
+    
+    EmotionDetection : Analyze facial expression
+    EmotionDetection : Assign emotion label
+    EmotionDetection --> [*]
+  }
+  
+  FaceDetection --> Categorization
+  
+  Categorization : Apply album rules
+  Categorization : Documents/Selfies/Events/\nLocations/Others
+  Categorization --> DatabaseSave
+  
+  DatabaseSave : Compile metadata JSON
+  DatabaseSave : INSERT INTO images
+  DatabaseSave : Save face data
+  DatabaseSave --> Completed : Success
+  DatabaseSave --> Failed : DB error
+}
+
+Processing --> Completed : All steps successful
+
+state Completed {
+  [*] --> InGallery
+  InGallery : Visible in UI
+  InGallery : Searchable
+  InGallery : In smart albums
+  
+  InGallery --> Favorited : User marks favorite
+  Favorited --> InGallery : User unfavorites
+  
+  InGallery --> Edited : User edits image
+  Edited --> InGallery : Save as copy
+  Edited --> Modified : Save as original
+  
+  Modified : Original overwritten
+  Modified : Edit state applied
+  Modified --> InGallery
+  
+  InGallery --> InAlbum : Added to custom album
+  InAlbum --> InGallery : Removed from album
+  
+  InGallery --> Locked : Moved to locker
+  Locked : PIN protected
+  Locked : Hidden from gallery
+  Locked --> InGallery : Unlocked from locker
+  
+  InGallery --> Trashed : Moved to trash
+}
+
+Processing --> Failed : Error occurred
+
+state Failed {
+  [*] --> Retry
+  Retry : Error logged
+  Retry : Can retry manually
+  Retry --> Queued : User retries
+  Retry --> PermanentFailure : Max retries exceeded
+  
+  PermanentFailure : Marked as unprocessable
+  PermanentFailure : Error stored in metadata
+}
+
+Completed --> Trashed : User deletes
+
+state Trashed {
+  [*] --> SoftDeleted
+  SoftDeleted : Retention: 30 days
+  SoftDeleted : Visible in Trash page
+  SoftDeleted : Can be restored
+  
+  SoftDeleted --> InGallery : Restore
+  SoftDeleted --> PermanentlyDeleted : Empty trash / expire
+  
+  PermanentlyDeleted : Removed from database
+  PermanentlyDeleted : References cleared
+  PermanentlyDeleted --> [*]
+}
+
+Trashed --> [*] : Permanently deleted
+
+note right of AIInference
+  **Processing Time**
+  • First image: 25-30s
+  • Subsequent: 20-25s
+  • Model loading is one-time
+end note
+
+note right of FaceDetection
+  **Face Recognition**
+  • Optional library
+  • Fallback to Qwen2-VL
+  • Adds 2-5 seconds
+  • Creates person albums
+end note
+
+note left of Completed
+  **Image Actions**
+  • View in gallery
+  • Edit (brightness, contrast, etc.)
+  • Add to albums
+  • Set as favorite
+  • Move to locker
+  • Delete (soft)
+end note
+
+note left of Trashed
+  **Trash Behavior**
+  • 30-day retention
+  • Bulk operations supported
+  • Restore anytime
+  • Auto-purge on expiry
+end note
+
+@enduml

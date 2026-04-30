@@ -1,0 +1,147 @@
+@startuml Component Diagram
+!theme cerulean-outline
+
+title SmartMedia - Component Diagram
+
+skinparam component {
+  BackgroundColor #1e3a5f
+  BorderColor #00bfff
+  FontColor white
+}
+
+skinparam package {
+  BackgroundColor #2d2d30
+  BorderColor #007acc
+  FontColor white
+}
+
+package "Desktop Application Layer" {
+  component [Electron Main Process] as ElectronMain {
+    portin IPC_In
+    portout IPC_Out
+  }
+  
+  component [React Frontend] as Frontend {
+    portin StateUpdates
+    portout UserActions
+  }
+  
+  component [Preload Bridge] as Preload
+}
+
+package "State Management Layer" {
+  component [Zustand Store] as Store {
+    portin Actions
+    portout StateChanges
+  }
+  
+  component [LocalStorage Persistence] as LocalStorage
+}
+
+package "AI Processing Layer" {
+  component [Python Engine] as PythonEngine {
+    portin Commands
+    portout Results
+  }
+  
+  component [Qwen2-VL Model] as Model
+  
+  component [Face Recognition] as FaceRec
+  
+  component [Image Preprocessor] as ImageProc
+}
+
+package "Data Layer" {
+  component [SQLite Database] as Database {
+    portin Queries
+    portout QueryResults
+  }
+  
+  component [Face Database\n(Pickle)] as FaceDB
+  
+  component [File System] as FileSystem
+}
+
+package "External Services" {
+  component [Model Registry\n(HuggingFace)] as HFRegistry
+  
+  component [OS APIs] as OS
+}
+
+' Frontend connections
+Frontend::UserActions --> Preload : "IPC calls"
+Preload --> ElectronMain::IPC_In : "Secure channel"
+ElectronMain::IPC_Out --> Preload : "Responses"
+Preload --> Frontend::StateUpdates : "Data updates"
+
+' State management
+Frontend --> Store::Actions : "Dispatch actions"
+Store::StateChanges --> Frontend : "Subscribe"
+Store --> LocalStorage : "Persist"
+LocalStorage --> Store : "Hydrate"
+
+' Electron to Python
+ElectronMain --> PythonEngine::Commands : "JSON stdin"
+PythonEngine::Results --> ElectronMain : "JSON stdout"
+
+' Python internal
+PythonEngine --> Model : "Inference"
+PythonEngine --> FaceRec : "Face detection"
+PythonEngine --> ImageProc : "Preprocessing"
+
+' Data access
+ElectronMain --> Database::Queries : "SQL"
+Database::QueryResults --> ElectronMain : "Results"
+PythonEngine --> FaceDB : "Save/Load"
+ElectronMain --> FileSystem : "Read/Write"
+
+' External
+PythonEngine --> HFRegistry : "Download models"
+ElectronMain --> OS : "Notifications\nWindow management"
+
+note right of Frontend
+  **UI Components**
+  • HomePage
+  • AlbumsPage
+  • FacesPage
+  • PhotoViewer
+  • AIChatbot
+  • Settings
+end note
+
+note right of ElectronMain
+  **Responsibilities**
+  • Process coordination
+  • IPC handling
+  • Python lifecycle
+  • Database operations
+  • File management
+end note
+
+note right of PythonEngine
+  **AI Capabilities**
+  • Object detection
+  • Scene analysis
+  • Caption generation
+  • Face recognition
+  • Emotion detection
+  • Natural language Q&A
+end note
+
+note right of Database
+  **Schema**
+  • images table
+  • metadata (JSON)
+  • Indexed queries
+  • ACID compliance
+end note
+
+note bottom of Model
+  **Qwen2-VL 2B Model**
+  • Vision-language transformer
+  • 2 billion parameters
+  • ~4GB size
+  • CPU/GPU inference
+end note
+
+@enduml

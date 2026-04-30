@@ -1,0 +1,207 @@
+@startuml  Class Diagram
+!theme cerulean-outline
+
+title SmartMedia - Frontend Class Diagram (React Components)
+
+' Main Application
+class App {
+  -currentScreen: Screen
+  +render(): JSX.Element
+  +handleScreenChange(screen: Screen): void
+}
+
+' Pages
+class HomePage {
+  -images: ImageMetadata[]
+  -selectedImage: ImageMetadata | null
+  -searchQuery: string
+  -viewMode: 'grid' | 'masonry'
+  -isProcessing: boolean
+  +handleAddPhotos(): void
+  +handleSearch(query: string): void
+  +handleOpenViewer(image: ImageMetadata): void
+  +handleDelete(imageId: string): void
+  +handleSetBanner(image: ImageMetadata): void
+  +render(): JSX.Element
+}
+
+class AlbumsPage {
+  -albums: Album[]
+  -smartAlbums: Album[]
+  -selectedAlbum: Album | null
+  -sortBy: 'name' | 'date' | 'count'
+  +generateSmartAlbums(): Album[]
+  +handleCreateAlbum(name: string): void
+  +handleViewAlbum(albumId: string): void
+  +handleDeleteAlbum(albumId: string): void
+  +render(): JSX.Element
+}
+
+class FacesPage {
+  -faces: Face[]
+  -selectedFace: Face | null
+  +loadFaces(): void
+  +handleNamePerson(faceId: string, name: string): void
+  +handleViewFaceImages(faceId: string): void
+  +handleMergeFaces(faceIds: string[]): void
+  +render(): JSX.Element
+}
+
+class ScanningScreen {
+  -scanProgress: ScanProgress
+  -currentImage: string
+  -discoveredImages: string[]
+  +processNextImage(): void
+  +skipCurrentImage(): void
+  +handleProcessInBackground(): void
+  +render(): JSX.Element
+}
+
+' Components
+class PhotoViewer {
+  -image: ImageMetadata
+  -isEditing: boolean
+  -editState: EditState
+  -zoom: number
+  +handleEdit(): void
+  +handleSave(): void
+  +handleAddTag(tag: string): void
+  +handleAIChat(message: string): void
+  +render(): JSX.Element
+}
+
+class AIChatbot {
+  -messages: Message[]
+  -input: string
+  -isLoading: boolean
+  -selectedImage: string | null
+  +handleSendMessage(message: string): void
+  +handleImageQuery(imageId: string, query: string): void
+  +handleSearchByDate(date: string): void
+  +render(): JSX.Element
+}
+
+class Sidebar {
+  -currentScreen: Screen
+  -collapsed: boolean
+  +handleNavigation(screen: Screen): void
+  +toggleCollapse(): void
+  +render(): JSX.Element
+}
+
+class ProcessingStatusBadge {
+  -queueLength: number
+  -currentTask: Task | null
+  -completed: number
+  -failed: number
+  +handleClearCompleted(): void
+  +render(): JSX.Element
+}
+
+' Store
+class AppStore {
+  -currentScreen: Screen
+  -userName: string
+  -images: ImageMetadata[]
+  -albums: Album[]
+  -searchQuery: string
+  -selectedTags: string[]
+  -scanProgress: ScanProgress
+  +setCurrentScreen(screen: Screen): void
+  +addImage(image: ImageMetadata): void
+  +addImages(images: ImageMetadata[]): void
+  +updateImage(id: string, updates: Partial<ImageMetadata>): void
+  +toggleFavorite(imageId: string): void
+  +moveToTrash(imageId: string): void
+  +addAlbum(album: Album): void
+  +setSearchQuery(query: string): void
+}
+
+' Types
+class ImageMetadata {
+  +id: string
+  +path: string
+  +filename: string
+  +caption: string
+  +tags: string[]
+  +objects: string[]
+  +faces: number
+  +metadata: Record<string, any>
+  +isFavorite: boolean
+  +isDeleted: boolean
+  +dateScanned: string
+}
+
+class Album {
+  +id: string
+  +name: string
+  +description: string
+  +imageIds: string[]
+  +isSmartAlbum: boolean
+  +coverImage: string | null
+  +createdAt: string
+  +updatedAt: string
+}
+
+class ScanProgress {
+  +total: number
+  +current: number
+  +currentImage: string
+  +status: 'idle' | 'scanning' | 'completed'
+  +detectedObjects: string[]
+  +generatedCaption: string
+}
+
+class EditState {
+  +brightness: number
+  +contrast: number
+  +saturation: number
+  +sharpness: number
+  +blur: number
+  +rotate: number
+  +flipX: boolean
+  +flipY: boolean
+}
+
+' Relationships
+App "1" *-- "1" HomePage : contains
+App "1" *-- "1" AlbumsPage : contains
+App "1" *-- "1" FacesPage : contains
+App "1" *-- "1" ScanningScreen : contains
+App "1" *-- "1" Sidebar : contains
+
+HomePage "1" *-- "0..1" PhotoViewer : displays
+HomePage "1" *-- "1" AIChatbot : includes
+HomePage "1" *-- "1" ProcessingStatusBadge : shows
+
+AlbumsPage ..> Album : uses
+FacesPage ..> ImageMetadata : displays
+PhotoViewer ..> EditState : uses
+PhotoViewer ..> ImageMetadata : edits
+
+App ..> AppStore : uses
+HomePage ..> AppStore : uses
+AlbumsPage ..> AppStore : uses
+FacesPage ..> AppStore : uses
+ScanningScreen ..> AppStore : updates
+
+AppStore "1" o-- "many" ImageMetadata : manages
+AppStore "1" o-- "many" Album : manages
+AppStore "1" *-- "1" ScanProgress : tracks
+
+note right of AppStore
+  **Zustand Global Store**
+  Centralized state management
+  Persistent across sessions
+  Type-safe with TypeScript
+end note
+
+note bottom of PhotoViewer
+  **Full-screen viewer**
+  • Edit capabilities
+  • AI chat integration
+  • Tag management
+  • Zoom & navigation
+end note
+
+@enduml

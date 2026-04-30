@@ -1,0 +1,301 @@
+@startuml Profile Diagram - SmartMedia Stereotypes
+!theme cerulean-outline
+
+title SmartMedia - Profile Diagram (Custom Stereotypes & Tagged Values)
+
+' Define stereotype icons and profiles
+stereotype Persistent {
+  {bound
+    bgcolor = FFE6E6
+    border = red
+  }
+}
+
+stereotype Volatile {
+  {bound
+    bgcolor = E6F3FF
+    border = blue
+  }
+}
+
+stereotype GPUAccelerated {
+  {bound
+    bgcolor = E6FFE6
+    border = green
+  }
+}
+
+stereotype RealTime {
+  {bound
+    bgcolor = FFF9E6
+    border = orange
+  }
+}
+
+stereotype External {
+  {bound
+    bgcolor = F0E6FF
+    border = purple
+  }
+}
+
+package "SmartMedia Profile Definition" {
+  
+  class "<<Persistent>> ImageEntity" as imgEntity {
+    {tag persistent_duration="application_lifetime"}
+    {tag storage_location="SQLite DB"}
+    {tag backup_strategy="weekly"}
+    {tag encryption="none"}
+    --
+    id : TEXT (PK)
+    path : TEXT (unique)
+    caption : TEXT
+    metadata : JSON
+    scanned_at : TIMESTAMP
+  }
+  
+  class "<<Persistent>> AlbumEntity" as albumEntity {
+    {tag persistent_duration="application_lifetime"}
+    {tag storage_location="SQLite DB"}
+    {tag mutable="true"}
+    {tag indexing="smart_criteria"}
+    --
+    id : TEXT (PK)
+    name : TEXT
+    is_smart_album : BOOL
+    smart_criteria : JSON
+  }
+  
+  class "<<Volatile>> FAISSIndex" as faissIdx {
+    {tag memory_location="RAM"}
+    {tag persistence="file-cached"}
+    {tag refresh_frequency="on_scan_complete"}
+    {tag data_type="float32_array"}
+    {tag dimensions="1536"}
+    --
+    index : IndexFlatL2
+    id_map : HashMap
+    normalized : bool
+  }
+  
+  class "<<Volatile>> SearchCache" as searchCache {
+    {tag memory_location="RAM"}
+    {tag ttl="5_minutes"}
+    {tag max_size="100_queries"}
+    {tag eviction_policy="LRU"}
+    --
+    query_text : str
+    vector : ndarray[1536]
+    results : List[ImageMetadata]
+    timestamp : datetime
+  }
+  
+  class "<<GPUAccelerated>> QwenVLModel" as qwenModel {
+    {tag hardware_requirement="CUDA GPU (8GB+) or CPU"}
+    {tag computation_type="mixed_precision"}
+    {tag parallelization="batch_processing"}
+    {tag optimization_enabled="true"}
+    {tag inference_precision="float16"}
+    --
+    model : Qwen2VLForConditionalGeneration
+    processor : AutoProcessor
+    device : "cuda" | "cpu"
+    dtype : torch.float16 | torch.float32
+  }
+  
+  class "<<GPUAccelerated>> FaceRecognitionEngine" as faceEngine {
+    {tag hardware_requirement="GPU preferred, CPU fallback"}
+    {tag computation_type="face_encoding"}
+    {tag batch_size="32"}
+    {tag precision="float64"}
+    --
+    detector_model : "hog" | "cnn"
+    encoder_model : deep-learning-based
+    upsample_num_times : int
+    face_distance_threshold : 0.6
+  }
+  
+  class "<<GPUAccelerated>> SentenceTransformer" as embedding {
+    {tag hardware_requirement="GPU optional"}
+    {tag computation_type="embedding_generation"}
+    {tag output_dimension="1536"}
+    {tag output_normalization="L2"}
+    --
+    model : "all-MiniLM-L6-v2"
+    device : "cuda" | "cpu"
+    batch_size : 32
+    normalize_embeddings : true
+  }
+  
+  class "<<RealTime>> UIStateStore" as uiStore {
+    {tag update_frequency="every_user_action"}
+    {tag synchronization="IPC_bidirectional"}
+    {tag consistency_model="eventual"}
+    {tag latency_target="<_100ms"}
+    --
+    currentScreen : str
+    selectedImage : ImageMetadata
+    isScanning : bool
+    scanProgress : ScanProgress
+  }
+  
+  class "<<RealTime>> ProgressNotifier" as progressNotifier {
+    {tag update_frequency="every_100ms"}
+    {tag transport="IPC_events"}
+    {tag guarantee="best_effort"}
+    {tag latency_sla="<_200ms"}
+    --
+    status : str
+    current : int
+    total : int
+    eta_seconds : int
+  }
+  
+  class "<<External>> ReverseGeocodeAPI" as geocodeAPI {
+    {tag external_service="OpenStreetMap/Nominatim"}
+    {tag rate_limit="1_req_per_sec"}
+    {tag timeout="5_seconds"}
+    {tag cache_results="true"}
+    {tag cache_ttl="30_days"}
+    --
+    lat : float
+    lon : float
+    accuracy : str
+  }
+  
+  class "<<External>> HuggingFaceHub" as hfHub {
+    {tag external_service="Hugging Face Model Hub"}
+    {tag authentication="optional_api_key"}
+    {tag download_cache="~10GB"}
+    {tag fallback="cached_models"}
+    --
+    model_id : str
+    revision : str
+    use_auth_token : bool
+  }
+  
+  class "<<Persistent>> FaceDatabase" as faceDb {
+    {tag persistent_duration="application_lifetime"}
+    {tag storage_location="pickle_files"}
+    {tag persistence_format="serialized_numpy"}
+    {tag indexed="true"}
+    --
+    face_encodings : Dict[face_id, ndarray[128]]
+    face_metadata : Dict[face_id, Metadata]
+    clustering_results : KMeans
+  }
+  
+  ' Relationships showing stereotype interactions
+  imgEntity --> albumEntity : "many-to-many\nvia album_images"
+  imgEntity --> faissIdx : "indexed by\nsemantics"
+  imgEntity --> faceDb : "linked to\nface_encodings"
+  
+  qwenModel --> imgEntity : "generates\nmetadata_for"
+  faceEngine --> faceDb : "populates"
+  embedding --> faissIdx : "populates"
+  
+  uiStore --> imgEntity : "displays"
+  progressNotifier --> uiStore : "updates"
+  
+  searchCache -.-> faissIdx : "queries"
+  searchCache -.-> geocodeAPI : "enriches_results"
+  
+  qwenModel -.-> hfHub : "downloads_from"
+  embedding -.-> hfHub : "downloads_from"
+  faceEngine -.-> hfHub : "downloads_pretrained"
+  
+}
+
+package "Stereotype Semantics" {
+  
+  class "<<Persistent>>" {
+    note right
+      **Persistent Stereotype**
+      Data that survives application restart
+      • Stored in SQLite database
+      • File-based storage
+      • Regular backups
+      • Version controlled in some cases
+      
+      Tagged Values:
+      - persistent_duration: lifetime scope
+      - storage_location: where data lives
+      - backup_strategy: preservation policy
+      - encryption: security measures
+    end note
+  }
+  
+  class "<<Volatile>>" {
+    note right
+      **Volatile Stereotype**
+      RAM-only data, lost on restart
+      • In-memory caches
+      • FAISS indexes
+      • Search result caches
+      • UI state during session
+      
+      Tagged Values:
+      - memory_location: RAM
+      - persistence: recovery mechanism
+      - refresh_frequency: invalidation strategy
+      - ttl: time-to-live
+      - max_size: memory limits
+    end note
+  }
+  
+  class "<<GPUAccelerated>>" {
+    note right
+      **GPU-Accelerated Stereotype**
+      Heavy computation on GPU/CUDA
+      • PyTorch models
+      • Face encoding
+      • Vector generation
+      • Inference operations
+      
+      Tagged Values:
+      - hardware_requirement: GPU specs
+      - computation_type: operation class
+      - parallelization: batch strategy
+      - optimization_enabled: perf tuning
+      - inference_precision: fp16/fp32
+    end note
+  }
+  
+  class "<<RealTime>>" {
+    note right
+      **Real-Time Stereotype**
+      Time-sensitive operations
+      • UI updates
+      • Progress notifications
+      • User interaction feedback
+      • IPC communication
+      
+      Tagged Values:
+      - update_frequency: refresh rate
+      - synchronization: protocol
+      - consistency_model: guarantee level
+      - latency_target: SLA
+      - latency_sla: performance SLO
+    end note
+  }
+  
+  class "<<External>>" {
+    note right
+      **External Stereotype**
+      Third-party integrations
+      • APIs
+      • Model hubs
+      • Geocoding services
+      • Cloud services
+      
+      Tagged Values:
+      - external_service: provider
+      - rate_limit: throttling
+      - timeout: failure threshold
+      - cache_results: optimization
+      - authentication: security
+    end note
+  }
+}
+
+@enduml

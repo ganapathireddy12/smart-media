@@ -1,0 +1,388 @@
+@startuml Activity Diagram - Album Organization
+!theme cerulean-outline
+
+title SmartMedia - Album Organization Activity Diagram
+
+|User|
+start
+:Navigate to Albums page;
+
+|System|
+:Load all images from database;
+
+:Load all user-created albums;
+
+partition "Smart Album Generation" {
+  
+  fork
+    :Filter images by\nmetadata.album_category = 'Documents';
+    
+    :Count matching images;
+    
+    if (Count > 0?) then (Yes)
+      :Create "Documents" album;
+      
+      :Set album properties:\n• ID: smart-documents\n• Is smart album: true\n• Image count: N\n• Cover: First image;
+    else (No)
+      :Skip album creation;
+    endif
+    
+  fork again
+    :Filter images by\nmetadata.album_category = 'Selfies';
+    
+    :Count matching images;
+    
+    if (Count > 0?) then (Yes)
+      :Create "Selfies" album;
+      :Set cover image;
+    endif
+    
+  fork again
+    :Filter images by\nmetadata.album_category = 'Events';
+    
+    :Count matching images;
+    
+    if (Count > 0?) then (Yes)
+      :Create "Events" album;
+      :Set cover image;
+    endif
+    
+  fork again
+    :Filter images by\nmetadata.album_category = 'Locations';
+    
+    :Count matching images;
+    
+    if (Count > 0?) then (Yes)
+      :Create "Locations" album;
+      :Set cover image;
+    endif
+    
+  fork again
+    :Filter images by\nmetadata.album_category = 'Others';
+    
+    :Count matching images;
+    
+    if (Count > 0?) then (Yes)
+      :Create "Others" album;
+      :Set cover image;
+    endif
+    
+  end fork
+  
+  :Combine smart albums array;
+}
+
+partition "Face Album Generation" {
+  
+  :Call IPC: getFaces();
+  
+  :Receive faces from\nFaceDatabase;
+  
+  if (Faces exist?) then (Yes)
+    
+    repeat :For each face;
+      
+      :Get face_id;
+      
+      :Get person name\n(or "Person N");
+      
+      :Get associated image paths;
+      
+      :Map paths to image IDs;
+      
+      :Create face album:\n• ID: face-{faceId}\n• Name: Person name\n• Is smart: true\n• imageIds: [...];
+      
+      :Set cover as first image;
+      
+    repeat while (More faces?) is (Yes)
+    ->No;
+    
+    :Add face albums to array;
+    
+  else (No)
+    :Skip face albums;
+  endif
+}
+
+:Combine:\n• Smart albums\n• Face albums\n• User albums;
+
+:Sort by creation date;
+
+:Display album grid;
+
+|User|
+fork
+  -> View Album;
+  :Click album card;
+  
+  |System|
+  :Get album details;
+  
+  :Filter images by album;
+  
+  if (Smart album?) then (Yes)
+    :Filter by album_category;
+  elseif (Face album?) then (Yes)
+    :Filter by face_id in images;
+  else (Custom album)
+    :Get imageIds from album;
+    :Map to ImageMetadata[];
+  endif
+  
+  :Display album contents;
+  
+  |User|
+  :Browse images;
+  
+  if (Want to remove image?) then (Yes)
+    :Long press / right click;
+    
+    |System|
+    if (Smart album?) then (Yes)
+      :Show "Cannot modify\nsmart albums" error;
+    else (Custom album)
+      :Show "Remove from album?" confirm;
+      
+      |User|
+      :Confirm;
+      
+      |System|
+      :Remove image ID from album.imageIds;
+      
+      :Update album in store;
+      
+      :Save to database;
+      
+      :Refresh album view;
+    endif
+  endif
+
+fork again
+  -> Create Custom Album;
+  :Click "+ Create Album";
+  
+  |System|
+  :Show modal dialog;
+  
+  |User|
+  :Enter album name;
+  
+  :Enter description (optional);
+  
+  :Click "Create";
+  
+  |System|
+  :Validate name\n(not empty, unique);
+  
+  if (Valid?) then (Yes)
+    :Generate album ID;
+    
+    :Create album object:\n{\n  id, name, description,\n  imageIds: [],\n  isSmartAlbum: false,\n  createdAt: now()\n};
+    
+    :Add to store.albums[];
+    
+    :Save to database;
+    
+    :Close modal;
+    
+    :Refresh albums view;
+    
+    :Show success message;
+    
+  else (No)
+    :Show validation error;
+    
+    backward :Allow corrections;
+  endif
+
+fork again
+  -> Add Images to Album;
+  :Select album;
+  
+  :Click "Add Images" button;
+  
+  |System|
+  :Show image picker modal;
+  
+  :Display all gallery images\n(excluding already in album);
+  
+  |User|
+  repeat
+    :Click image thumbnail;
+    
+    |System|
+    :Toggle selection;
+    
+    :Update selected count;
+    
+  repeat while (Select more?) is (Yes)
+  ->No;
+  
+  :Click "Add Selected";
+  
+  |System|
+  :Validate selection\n(at least 1);
+  
+  if (Valid?) then (Yes)
+    repeat :For each selected image;
+      
+      :Add image.id to album.imageIds;
+      
+    repeat while (More selected?) is (Yes)
+    ->No;
+    
+    :Update album.updatedAt;
+    
+    :Save album to database;
+    
+    :Refresh album view;
+    
+    :Show "Added N images"\nsuccess message;
+    
+  else (No)
+    :Show "No images selected"\nerror;
+  endif
+
+fork again
+  -> Edit Album;
+  :Click album menu → Edit;
+  
+  |System|
+  if (Smart album?) then (Yes)
+    :Show "Cannot edit\nsmart albums" message;
+  else (Custom album)
+    :Show edit modal;
+    
+    :Pre-fill current values;
+    
+    |User|
+    :Modify name/description;
+    
+    :Click "Save";
+    
+    |System|
+    :Validate changes;
+    
+    if (Valid?) then (Yes)
+      :Update album in store;
+      
+      :Update album.updatedAt;
+      
+      :Save to database;
+      
+      :Close modal;
+      
+      :Refresh albums view;
+      
+    else (No)
+      :Show validation errors;
+      
+      backward :Allow corrections;
+    endif
+  endif
+
+fork again
+  -> Delete Album;
+  :Click album menu → Delete;
+  
+  |System|
+  if (Smart album?) then (Yes)
+    :Show "Cannot delete\nsmart albums" error;
+  elseif (Face album?) then (Yes)
+    :Show "Cannot delete\nface albums" error;
+    note right: Face albums are\nauto-generated
+  else (Custom album)
+    :Show confirmation dialog:\n"Delete album?\nImages will not be deleted.";
+    
+    |User|
+    :Confirm deletion;
+    
+    |System|
+    :Remove album from store.albums[];
+    
+    :Delete from database:\nDELETE FROM albums\nWHERE id = ?;
+    
+    :Delete junction records:\nDELETE FROM album_images\nWHERE album_id = ?;
+    
+    :Refresh albums view;
+    
+    :Show "Album deleted"\nmessage;
+    
+    note right: Images remain\nin gallery
+  endif
+
+fork again
+  -> Sort Albums;
+  :Click sort dropdown;
+  
+  |System|
+  :Show options:\n• By Name (A-Z)\n• By Date (Newest)\n• By Count (Most);
+  
+  |User|
+  :Select sort option;
+  
+  |System|
+  switch (Sort by?)
+    case (Name)
+      :Sort albums\nalphabetically;
+    case (Date)
+      :Sort by createdAt\n(descending);
+    case (Count)
+      :Sort by imageIds.length\n(descending);
+  endswitch
+  
+  :Re-render album grid;
+
+fork again
+  -> Search Albums;
+  :Enter search query;
+  
+  |System|
+  :Apply 300ms debounce;
+  
+  :Filter albums by:\n• Name contains query\n• Description contains query;
+  
+  :Display filtered albums;
+  
+  if (Results found?) then (Yes)
+    :Show matching albums;
+  else (No)
+    :Show "No albums found"\nmessage;
+  endif
+
+end fork
+
+|User|
+:Continue browsing albums;
+
+stop
+
+note right of "Smart Album Generation"
+  **Auto-generated Categories**
+  • Based on AI analysis during scan
+  • Cannot be manually modified
+  • Update automatically as
+    new images are added
+  • Always present if images exist
+end note
+
+note right of "Face Album Generation"
+  **Person-based Albums**
+  • One album per detected person
+  • Auto-updates when faces matched
+  • Can rename person
+  • Cannot manually add/remove images
+  • Requires face_recognition library
+end note
+
+note left of "Create Custom Album"
+  **User Albums**
+  • Fully customizable
+  • Manual image management
+  • Can have same image in
+    multiple albums
+  • Editable name/description
+  • Deletable without affecting images
+end note
+
+@enduml

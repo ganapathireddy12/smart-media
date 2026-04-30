@@ -1,0 +1,285 @@
+@startuml Activity Diagram - Search and Filter Operations
+!theme cerulean-outline
+
+title SmartMedia - Search and Filter Activity Diagram
+
+|User|
+start
+
+:Open HomePage;
+
+|System|
+:Load images from\nSQLite database;
+
+:Display gallery grid;
+
+|User|
+fork
+  -> Search by text;
+  :Enter search query\nin search bar;
+  
+  |System|
+  :Capture input;
+  
+  :Apply 300ms debounce;
+  note right: Prevents excessive\nre-renders
+  
+  :Convert query to\nlowercase;
+  
+  partition "Text Matching" {
+    :Search in image.caption;
+    
+    :Search in image.filename;
+    
+    :Search in image.tags[];
+    
+    :Search in image.objects[];
+    
+    :Combine all matches;
+  }
+  
+  :Filter images array;
+  
+  :Update filteredImages state;
+  
+  :Re-render gallery;
+  
+  if (Results found?) then (Yes)
+    :Display matching images;
+  else (No)
+    :Show "No results" message;
+  endif
+
+fork again
+  -> Filter by tags;
+  :Click tag filter button;
+  
+  |System|
+  :Show all available tags;
+  
+  |User|
+  repeat
+    :Select tag;
+    
+    |System|
+    :Add tag to selectedTags[];
+    
+    :Update tag chips display;
+    
+    partition "Tag Filtering" {
+      if (Multiple tags selected?) then (Yes)
+        :Apply AND logic;
+        note right: Image must have\nALL selected tags
+        
+        repeat :Check image.tags[];
+          if (Contains all selected tags?) then (Yes)
+            :Include in results;
+          else (No)
+            :Exclude from results;
+          endif
+        repeat while (More images?) is (Yes)
+      else (Single tag)
+        :Match single tag;
+      endif
+    }
+    
+    :Update gallery display;
+    
+  repeat while (User selects more tags?) is (Yes)
+  ->No;
+
+fork again
+  -> Navigate to Albums;
+  :Click "Albums" in sidebar;
+  
+  |System|
+  :Navigate to AlbumsPage;
+  
+  :Generate smart albums;
+  
+  partition "Smart Album Generation" {
+    :Group by album_category;
+    
+    fork
+      :Filter images where\nalbum_category = 'Selfies';
+      :Create "Selfies" album;
+    fork again
+      :Filter images where\nalbum_category = 'Events';
+      :Create "Events" album;
+    fork again
+      :Filter images where\nalbum_category = 'Documents';
+      :Create "Documents" album;
+    fork again
+      :Filter images where\nalbum_category = 'Locations';
+      :Create "Locations" album;
+    fork again
+      :Filter remaining images;
+      :Create "Others" album;
+    end fork
+  }
+  
+  :Display album cards;
+  
+  |User|
+  :Click album card;
+  
+  |System|
+  :Filter images by\nselected album;
+  
+  :Display album contents;
+
+fork again
+  -> Filter by Emotions;
+  :Click "Emotions" in sidebar;
+  
+  |System|
+  :Navigate to EmotionsPage;
+  
+  partition "Emotion Aggregation" {
+    :Scan all images;
+    
+    repeat :Read image.metadata.emotion;
+      
+      if (Emotion exists?) then (Yes)
+        :Increment emotion counter;
+      endif
+      
+    repeat while (More images?) is (Yes)
+    ->No;
+    
+    :Sort emotions by count;
+  }
+  
+  :Display emotion cards\nwith counts;
+  
+  |User|
+  :Click emotion (e.g., "Happy");
+  
+  |System|
+  :Filter images where\nemotion = 'happy';
+  
+  :Display filtered results;
+
+fork again
+  -> View Faces;
+  :Click "Faces" in sidebar;
+  
+  |System|
+  :Navigate to FacesPage;
+  
+  :Load faces from\nFaceDatabase;
+  
+  partition "Face Grouping" {
+    repeat :For each face;
+      
+      :Get face_id;
+      
+      :Get person name;
+      
+      :Count associated images;
+      
+      :Generate face card;
+      
+    repeat while (More faces?) is (Yes)
+    ->No;
+  }
+  
+  :Display face grid;
+  
+  |User|
+  :Click face card;
+  
+  |System|
+  :Get all images with\nmatching face_id;
+  
+  :Display person's photos;
+
+fork again
+  -> Filter Favorites;
+  :Click "Favorites" in sidebar;
+  
+  |System|
+  :Navigate to FavoritesPage;
+  
+  :Filter images where\nisFavorite = true;
+  
+  :Display favorite images;
+end fork
+
+|User|
+if (Results satisfactory?) then (Yes)
+  :Browse filtered images;
+  
+  if (Want to view image?) then (Yes)
+    :Click image;
+    
+    |System|
+    :Open PhotoViewer;
+    
+    :Display full-screen image;
+    
+    :Show metadata panel;
+  endif
+else (No)
+  :Modify search/filters;
+  
+  backward :Repeat search;
+endif
+
+if (Want to clear filters?) then (Yes)
+  :Click "Clear All" or "X" button;
+  
+  |System|
+  :Reset selectedTags = [];
+  
+  :Reset searchQuery = "";
+  
+  :Display all images;
+else (No)
+  :Continue browsing;
+endif
+
+stop
+
+note right of "Text Matching"
+  **Search Scope**
+  • Captions (AI-generated)
+  • Filenames
+  • Tags
+  • Detected objects
+  • Scene descriptions
+  
+  **Case-insensitive matching**
+end note
+
+note right of "Tag Filtering"
+  **Tag Logic**
+  • AND: Image must have ALL tags
+  • OR: Not currently supported
+  • Multi-select enabled
+  • Visual chips for selected tags
+end note
+
+note right of "Smart Album Generation"
+  **Album Categories**
+  1. Documents (screenshots)
+  2. Selfies (single person)
+  3. Events (gatherings)
+  4. Locations (landscapes)
+  5. Others (general)
+  
+  **AI-determined during scan**
+end note
+
+note right of "Emotion Aggregation"
+  **Supported Emotions**
+  • Happy, Sad, Angry
+  • Surprised, Fearful
+  • Disgusted, Neutral
+  • Excited, Peaceful
+  • Loving, Contemplative
+  
+  **Detected by Qwen2-VL**
+end note
+
+@enduml

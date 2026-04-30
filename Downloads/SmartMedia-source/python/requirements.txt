@@ -1,0 +1,95 @@
+# SmartMedia AI Engine Requirements v5.0 - Qwen2-VL Edition
+# Install with: pip install -r requirements.txt
+
+# Core - Required
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# Optional: OpenCV for faster image resizing
+opencv-python>=4.8.0
+
+# ===== AI Model Stack =====
+# Qwen2-VL 2B - Single model for ALL AI tasks:
+# - Image Captioning (detailed 30-word descriptions)
+# - Object Detection
+# - Scene Classification
+# - Face/Person Detection
+# - Character Recognition
+
+# PyTorch - Required
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Transformers with Qwen2-VL support
+transformers>=4.45.0
+
+# Required for Qwen2-VL
+qwen-vl-utils>=0.0.2
+accelerate>=0.26.0
+
+# For INT4 quantization (reduces 4GB model to ~1.5GB)
+bitsandbytes>=0.41.0
+optimum>=1.16.0
+
+# ===== AI Chatbot Enhancement =====
+# Spell checking for auto-correct
+autocorrect>=2.6.1
+pyspellchecker>=0.7.2
+
+# Web search and scraping
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+duckduckgo-search>=5.3.0
+sentence-transformers>=2.5.0
+
+# GPS reverse geocoding for location names
+geopy>=2.4.0
+
+# Image similarity detection (perceptual hashing)
+ImageHash>=4.3.1
+
+# ===== Document Conversion Tools =====
+# PDF to Word
+pdf2docx>=0.5.8
+
+# Word to PDF (Windows requires MS Word)
+docx2pdf>=0.1.8
+
+# Image to PDF
+img2pdf>=0.5.1
+
+# PDF Manipulation (Merge, Split)
+pypdf>=3.17.4
+
+# PDF Rendering / PDF to Image
+pymupdf>=1.23.8
+
+# ===== Face Recognition (OPTIONAL) =====
+# For advanced face detection, recognition, and clustering
+# NOTE: On Windows, requires Visual C++ Build Tools
+# If installation fails, the app will use Qwen2-VL for face detection instead
+# 
+# To install manually:
+#   1. Install cmake: pip install cmake
+#   2. Install dlib: pip install dlib (requires C++ compiler)
+#   3. Install face-recognition: pip install face-recognition
+#
+# Or run: install-face-recognition.bat
+#
+# face-recognition>=1.3.0
+# dlib>=19.24.0
+
+# ==================== NOTES ====================
+# Qwen2-VL 2B INT4 Advantages:
+# - Single model replaces YOLO + BLIP + CLIP
+# - Better quality captions than BLIP
+# - Built-in object detection capability
+# - Scene understanding included
+# - ~1.5GB memory footprint with INT4
+# 
+# Hardware Requirements:
+# - 4GB+ VRAM GPU recommended (CUDA)
+# - Or 8GB+ RAM for CPU inference
+# 
+# Model will auto-download on first run (~4GB download, ~1.5GB after quantization)

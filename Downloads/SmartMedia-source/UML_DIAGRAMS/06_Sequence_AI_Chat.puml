@@ -1,0 +1,190 @@
+@startuml Sequence Diagram - AI Chat Interaction
+!theme cerulean-outline
+
+title SmartMedia - AI Chatbot Interaction Sequence
+
+actor User
+participant "AIChatbot\nComponent" as Chatbot
+participant "AppStore" as Store
+participant "Electron\nIPC" as IPC
+participant "Python\nEngine" as Python
+participant "Qwen2-VL\nModel" as Model
+participant "SQLite\nDatabase" as DB
+
+User -> Chatbot: Click AI Chatbot FAB
+activate Chatbot
+
+Chatbot -> Chatbot: setState({ isOpen: true })
+Chatbot -> User: Show chat interface
+
+== User Query - Text Search ==
+
+User -> Chatbot: Type: "Show me photos\nfrom the beach"
+activate User
+
+Chatbot -> Chatbot: Update input state
+
+User -> Chatbot: Click Send
+Chatbot -> Chatbot: Add user message\nto messages[]
+
+Chatbot -> Chatbot: setIsLoading(true)
+
+Chatbot -> Store: Get all images
+activate Store
+Store -> Chatbot: images[]
+deactivate Store
+
+Chatbot -> Chatbot: Filter images by:\n• tags: "beach"\n• objects: "ocean", "sand"\n• scene: "outdoor"
+
+Chatbot -> Chatbot: Format response:\n"Found 15 beach photos"
+
+Chatbot -> Chatbot: Add AI response\nto messages[]
+
+Chatbot -> Chatbot: setIsLoading(false)
+Chatbot -> User: Display results\nwith image grid
+
+deactivate User
+
+== User Query - Image Analysis ==
+
+User -> Chatbot: Click "Attach Image"
+activate User
+
+Chatbot -> User: Show image picker
+User -> Chatbot: Select image
+
+Chatbot -> Chatbot: Set selectedImage\nLoad preview
+
+User -> Chatbot: Type: "What's in\nthis photo?"
+
+Chatbot -> Chatbot: Add message with\nimage attachment
+
+Chatbot -> IPC: aiChat(imagePath,\n"What's in this photo?")
+activate IPC
+
+IPC -> Python: {"action": "ai_chat",\n"image_path": path,\n"message": query}
+activate Python
+
+Python -> Model: Load image\nPrepare vision input
+activate Model
+
+Model -> Model: Vision-language\nprocessing
+
+Model -> Python: Generated response:\n"This photo shows a golden\nretriever playing in a park\nwith a frisbee."
+deactivate Model
+
+Python -> IPC: {"success": true,\n"response": text}
+deactivate Python
+
+IPC -> Chatbot: Chat response
+deactivate IPC
+
+Chatbot -> Chatbot: Add AI response\nto messages[]
+
+Chatbot -> User: Display AI answer\nwith image preview
+
+deactivate User
+
+== User Query - Metadata Request ==
+
+User -> Chatbot: Type: "When was\nthis taken?"
+activate User
+
+Chatbot -> Store: getImage(selectedImageId)
+activate Store
+Store -> Chatbot: ImageMetadata
+deactivate Store
+
+Chatbot -> Chatbot: Extract dateScanned:\n"2024-06-15"
+
+Chatbot -> Chatbot: Format response:\n"This photo was scanned\non June 15, 2024"
+
+Chatbot -> User: Display metadata
+
+deactivate User
+
+== User Query - Complex Search ==
+
+User -> Chatbot: Type: "Find photos of\npeople smiling at\nevents"
+activate User
+
+Chatbot -> Store: Get all images
+activate Store
+Store -> Chatbot: images[]
+deactivate Store
+
+Chatbot -> Chatbot: Filter by:\n• face_count > 0\n• emotion: "happy"\n• album_category: "Events"
+
+Chatbot -> DB: Query images with\nfilters
+activate DB
+
+DB -> DB: SELECT * FROM images\nWHERE metadata->>'album_category' = 'Events'\nAND metadata->>'emotion' = 'happy'
+
+DB -> Chatbot: Matching images
+deactivate DB
+
+Chatbot -> Chatbot: Format results:\n"Found 23 happy moments\nfrom events"
+
+Chatbot -> User: Display grid of\nmatching images
+
+deactivate User
+
+== User Action - Navigate to Image ==
+
+User -> Chatbot: Click image in\nchat results
+activate User
+
+Chatbot -> Chatbot: Find image index\nin filtered list
+
+Chatbot -> Chatbot: Open PhotoViewer\nwith image
+
+Chatbot -> User: Show full-screen\nimage viewer
+
+deactivate User
+
+== User Action - Clear Chat ==
+
+User -> Chatbot: Click menu →\n"Clear History"
+activate User
+
+Chatbot -> Chatbot: setMessages([])
+
+Chatbot -> User: Show empty chat\nwith suggestions
+
+User -> Chatbot: Click "X" to close
+Chatbot -> Chatbot: setState({ isOpen: false })
+Chatbot -> User: Hide chat interface
+
+deactivate User
+deactivate Chatbot
+
+note over User, Chatbot
+  **Quick Actions**
+  • "Show me favorites"
+  • "Photos from last week"
+  • "Find documents"
+  • "Selfies only"
+  • "Pictures with [name]"
+end note
+
+note over Python, Model
+  **AI Chat Capabilities**
+  • Image description
+  • Object identification
+  • Scene explanation
+  • Activity recognition
+  • Emotion interpretation
+  • Contextual Q&A
+end note
+
+note over Chatbot, DB
+  **Search Features**
+  • Natural language queries
+  • Date range filtering
+  • Tag-based search
+  • Face-based search
+  • Emotion filtering
+  • Album filtering
+end note
+
+@enduml

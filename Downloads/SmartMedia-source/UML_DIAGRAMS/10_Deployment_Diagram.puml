@@ -1,0 +1,133 @@
+@startuml Deployment Diagram
+!theme cerulean-outline
+
+title SmartMedia - Deployment Diagram
+
+node "User's Windows PC" {
+  
+  node "<<Desktop Application>>\nElectron Container" as ElectronNode {
+    artifact "SmartMedia.exe" as MainApp
+    
+    node "<<Main Process>>\nNode.js Runtime" as MainProcess {
+      component "main.js" as MainJS
+      component "IPC Handlers" as IPC
+      component "Database Manager" as DBMgr
+    }
+    
+    node "<<Renderer Process>>\nChromium" as RendererProcess {
+      component "React App (index.html)" as ReactApp
+      component "Bundled JS/CSS" as Bundle
+    }
+    
+    MainApp ..> MainProcess : spawns
+    MainApp ..> RendererProcess : spawns
+  }
+  
+  node "<<Python Runtime>>\nPython 3.9+" as PythonNode {
+    component "main.py" as PythonMain
+    component "SmartMediaEngine" as Engine
+    
+    node "<<AI Models>>" as AIModels {
+      artifact "Qwen2-VL-2B\n(4GB)" as Model
+      artifact "face_recognition\n(optional)" as FaceLib
+    }
+    
+    PythonMain --> Engine
+    Engine --> Model : loads
+    Engine ..> FaceLib : uses
+  }
+  
+  database "<<SQLite>>\nLocal Database" as SQLiteDB {
+    storage "smartmedia.db" as MainDB
+    storage "wal file" as WAL
+  }
+  
+  database "<<Pickle File>>\nFace Database" as FaceDatabase {
+    storage "faces.pkl" as FaceFile
+  }
+  
+  folder "<<User Directory>>\nApplication Data" as AppData {
+    folder "models/" as ModelsDir
+    folder "data/" as DataDir
+    folder "converted/" as ConvertedDir
+  }
+  
+  folder "<<User Selected>>\nMedia Folder" as MediaFolder {
+    storage "User Photos" as UserPhotos
+    storage "User Videos" as UserVideos
+  }
+  
+  cloud "<<External>>\nInternet" as Internet {
+    node "HuggingFace Model Hub" as HFHub
+  }
+  
+  ' Connections
+  MainProcess --> PythonNode : "spawns child process\nstdin/stdout pipe"
+  MainProcess --> SQLiteDB : "SQL queries\n(better-sqlite3)"
+  PythonNode --> FaceDatabase : "pickle load/save"
+  
+  MainProcess --> AppData : "read/write"
+  PythonNode --> AppData : "model storage"
+  
+  MainProcess --> MediaFolder : "read images\ngenerate thumbnails"
+  
+  PythonNode --> Internet : "download models\n(first run only)"
+  
+  RendererProcess <--> MainProcess : "IPC communication\n(contextBridge)"
+  
+  AIModels -[hidden]-> ModelsDir
+  SQLiteDB -[hidden]-> DataDir
+  FaceDatabase -[hidden]-> DataDir
+}
+
+node "<<Optional>>\nDocker Container" as DockerNode {
+  component "Docker Image" as DockerImage
+  component "Multi-stage Build" as MultiStage
+  
+  note right of DockerNode
+    **Docker Support**
+    • Development profile (hot-reload)
+    • Production profile (optimized)
+    • AI-only profile (microservice)
+    
+    Ports:
+    • 5173 (dev)
+    • 5000 (prod)
+    • 5001 (AI only)
+  end note
+}
+
+note right of ElectronNode
+  **System Requirements**
+  • Windows 10/11
+  • 8GB RAM (16GB recommended)
+  • ~6GB free disk space
+  • CPU: Multi-core recommended
+  • GPU: Optional (faster inference)
+end note
+
+note right of PythonNode
+  **Python Dependencies**
+  • torch, transformers
+  • Pillow, qwen-vl-utils
+  • face_recognition (optional)
+  • sqlite3 (built-in)
+end note
+
+note bottom of SQLiteDB
+  **Database Details**
+  • Single file database
+  • WAL mode enabled
+  • Auto-vacuum
+  • ~100KB per 1000 images
+end note
+
+note bottom of MediaFolder
+  **Original Files**
+  • Not copied/moved
+  • Only metadata extracted
+  • Thumbnails cached
+  • Non-destructive operations
+end note
+
+@enduml
